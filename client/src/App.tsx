@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from './contexts/authContext';
 import { AICookingAssistant } from './components/AICookingAssistant';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BottomNav } from './components/BottomNav';
+import { Sidebar } from './components/Sidebar';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState('home');
@@ -68,15 +69,25 @@ function AppContent() {
     return <Loading fullScreen />;
   }
   return <div className="w-full min-h-screen bg-gray-50">
-    {currentView === 'login' && <Login onLoginSuccess={navigateToHome} onSignUp={navigateToSignUp} />}
-    {currentView === 'home' && isAuthenticated && <Home onLogin={navigateToLogin} onCookWithWhatIHave={navigateToAiAssistant} onViewCalendar={navigateToCalendar} onPantryInventory={navigateToPantryInventory} onShoppingList={navigateToShoppingList} onRecipeManager={navigateToRecipeManager} onSettings={navigateToSettings} />}
-    {currentView === 'aiAssistant' && isAuthenticated && <AICookingAssistant onBack={navigateToHome} />}
-    {currentView === 'calendar' && isAuthenticated && <Calendar onBack={navigateToHome} />}
-    {currentView === 'recipeManager' && isAuthenticated && <RecipeManager onBack={navigateToHome} />}
-    {currentView === 'settings' && isAuthenticated && <Settings onBack={navigateToHome} />}
-    {currentView === 'pantryInventory' && isAuthenticated && <PantryInventory onBack={navigateToHome} />}
-    {currentView === 'shoppingList' && isAuthenticated && <ShoppingList onBack={navigateToHome} />}
-    {currentView === 'signup' && <SignUp onSignUpSuccess={navigateToHome} onLogin={navigateToLogin} />}
+    {/* Desktop Sidebar — hidden on mobile */}
+    {currentView !== 'login' && currentView !== 'signup' && (
+      <Sidebar activeView={currentView} onNavigate={handleNavigate} />
+    )}
+
+    {/* Main content area — offset for sidebar on desktop */}
+    <div className={currentView !== 'login' && currentView !== 'signup' ? 'lg:pl-60' : ''}>
+      {currentView === 'login' && <Login onLoginSuccess={navigateToHome} onSignUp={navigateToSignUp} />}
+      {currentView === 'home' && isAuthenticated && <Home onLogin={navigateToLogin} onCookWithWhatIHave={navigateToAiAssistant} onViewCalendar={navigateToCalendar} onPantryInventory={navigateToPantryInventory} onShoppingList={navigateToShoppingList} onRecipeManager={navigateToRecipeManager} onSettings={navigateToSettings} />}
+      {currentView === 'aiAssistant' && isAuthenticated && <AICookingAssistant onBack={navigateToHome} />}
+      {currentView === 'calendar' && isAuthenticated && <Calendar onBack={navigateToHome} />}
+      {currentView === 'recipeManager' && isAuthenticated && <RecipeManager onBack={navigateToHome} />}
+      {currentView === 'settings' && isAuthenticated && <Settings onBack={navigateToHome} />}
+      {currentView === 'pantryInventory' && isAuthenticated && <PantryInventory onBack={navigateToHome} />}
+      {currentView === 'shoppingList' && isAuthenticated && <ShoppingList onBack={navigateToHome} />}
+      {currentView === 'signup' && <SignUp onSignUpSuccess={navigateToHome} onLogin={navigateToLogin} />}
+    </div>
+
+    {/* Mobile BottomNav — hidden on desktop */}
     {currentView !== 'login' && currentView !== 'signup' && (
       <BottomNav activeView={currentView} onNavigate={handleNavigate} />
     )}

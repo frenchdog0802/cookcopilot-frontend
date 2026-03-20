@@ -25,7 +25,7 @@ export function Settings({
     }, 3000);
   };
   return <div className="flex flex-col w-full min-h-screen bg-gray-50">
-    <div className="flex-1 overflow-y-auto pb-20">
+    <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
       {/* Header */}
       <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
         <div className="container mx-auto flex items-center">
@@ -36,7 +36,7 @@ export function Settings({
         </div>
       </header>
       {/* Main Content */}
-      <main className="flex-1 container mx-auto p-5">
+      <main className="flex-1 container mx-auto p-5 max-w-3xl">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Tabs */}
           <div className="flex border-b border-gray-200">

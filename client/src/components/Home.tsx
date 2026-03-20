@@ -51,7 +51,7 @@ export function Home({
     );
   }
 
-  return <div className="flex flex-col w-full min-h-screen bg-white">
+  return <div className="flex flex-col w-full min-h-screen bg-white pb-20 lg:pb-0">
     {/* Header */}
     <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
       <div className="container mx-auto flex justify-between items-center">
@@ -67,7 +67,7 @@ export function Home({
       </div>
     </header>
     {/* Main Content */}
-    <main className="flex-1 container mx-auto p-5 flex flex-col">
+    <main className="flex-1 container mx-auto p-5 flex flex-col max-w-6xl">
       {/* User Welcome */}
       {user && <div className="mb-6">
         <h2 className="text-xl font-medium text-gray-800">
@@ -79,29 +79,29 @@ export function Home({
         <h3 className="font-medium text-gray-700 mb-4 text-lg">
           My Kitchen Stats
         </h3>
-        <div className="grid grid-cols-2 gap-6">
-          <div className="bg-gray-50 p-5 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:bg-pink-50 hover:border-pink-100 transition-colors" onClick={onPantryInventory}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-gray-50 p-4 lg:p-5 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:bg-pink-50 hover:border-pink-100 transition-colors" onClick={onPantryInventory}>
             <div className="flex items-center">
-              <div className="text-3xl font-bold text-red-600 mb-1 mr-2">
+              <div className="text-2xl lg:text-xl font-bold text-red-600 mb-1 mr-2">
                 {pantryItems.length}
               </div>
-              {pantryItems.length > 0 && <PackageIcon size={20} className="text-red-600" />}
+              {pantryItems.length > 0 && <PackageIcon size={18} className="text-red-600" />}
             </div>
-            <p className="text-gray-600">Items in Pantry</p>
+            <p className="text-sm text-gray-600">Items in Pantry</p>
           </div>
-          <div className="bg-gray-50 p-5 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-100 transition-colors" onClick={onShoppingList}>
+          <div className="bg-gray-50 p-4 lg:p-5 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-100 transition-colors" onClick={onShoppingList}>
             <div className="flex items-center">
-              <div className="text-3xl font-bold text-blue-600 mb-1 mr-2">
+              <div className="text-2xl lg:text-xl font-bold text-blue-600 mb-1 mr-2">
                 {itemsToBuy}
               </div>
-              {itemsToBuy > 0 && <ShoppingCartIcon size={20} className="text-blue-600" />}
+              {itemsToBuy > 0 && <ShoppingCartIcon size={18} className="text-blue-600" />}
             </div>
             <p className="text-gray-600">Items to Buy</p>
           </div>
         </div>
       </div>
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <button onClick={onViewCalendar} className="flex flex-col items-center justify-center p-5 bg-red-50 rounded-xl border border-red-100 hover:bg-red-100 transition-colors">
           <ClipboardListIcon size={32} className="text-red-600 mb-3" />
           <span className="text-gray-800 font-medium">Plan Your Meals</span>
@@ -135,7 +135,7 @@ export function Home({
         </button>
       </div>
       {/* Featured Image */}
-      <div className="relative w-full h-72 rounded-2xl overflow-hidden mb-10 shadow-lg">
+      <div className="relative w-full h-56 lg:h-auto lg:aspect-video lg:max-h-64 rounded-2xl overflow-hidden mb-10 shadow-lg">
         <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80" alt="Food preparation with fresh ingredients" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         <div className="absolute bottom-0 left-0 right-0 p-6">

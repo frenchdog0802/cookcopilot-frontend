@@ -37,7 +37,7 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
     <>
       {/* ===== 二級選單（More） ===== */}
       {showMore && (
-        <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowMore(false)}>
+        <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setShowMore(false)}>
           <div
             className="absolute bottom-20 left-1/2 -translate-x-1/2 w-56 bg-white rounded-xl shadow-xl p-2"
             onClick={e => e.stopPropagation()}
@@ -63,7 +63,7 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
       )}
 
       {/* ===== Bottom Nav ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 lg:hidden">
         <div className="grid grid-cols-5 h-16 max-w-screen-lg mx-auto">
           {primaryNav.map(item => {
             const Icon = item.icon;

@@ -376,9 +376,9 @@ export function Calendar({
   }, [currentWeekStart]);
 
   return <div className="flex flex-col w-full min-h-screen bg-gray-50">
-    <div className="flex-1 overflow-y-auto pb-20">
+    <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-md z-50">
+      <header className="fixed top-0 left-0 right-0 lg:left-60 bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-md z-50">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <button onClick={onBack} className="p-2 rounded-full hover:bg-white/20 transition-colors active:bg-white/30" aria-label="Go back">
             <ArrowLeftIcon size={20} />
@@ -390,7 +390,7 @@ export function Calendar({
         </div>
       </header>
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pt-14 px-4 pb-4">
+      <main className="flex-1 overflow-y-auto pt-14 px-4 pb-4 max-w-6xl mx-auto">
         {/* View Toggle */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 mb-2 mt-2">
           <div className="flex justify-between items-center mb-3">
@@ -441,14 +441,14 @@ export function Calendar({
                     snack: dayMeals.some((meal: MealPlan) => meal.meal_type === 'snack')
                   };
                   return <div key={index} onClick={() => handleDayClick(day)} className={`
-                          aspect-square p-2 relative flex flex-col justify-between
+                          aspect-square lg:aspect-auto lg:min-h-[4.5rem] p-1.5 lg:p-2 relative flex flex-col justify-between
                           ${day ? 'cursor-pointer active:scale-95' : ''}
                           ${isSelected ? 'bg-red-50 border-2 border-red-400' : day ? 'bg-white border border-gray-100' : 'bg-transparent'}
                           ${isToday && !isSelected ? 'border-2 border-red-300' : ''}
                           rounded-lg transition-all duration-150
                         `}>
                     {day && <>
-                      <span className={`text-center text-lg ${isToday ? 'font-bold text-red-600' : 'text-gray-700'} leading-none`}>
+                      <span className={`text-center text-sm lg:text-base ${isToday ? 'font-bold text-red-600' : 'text-gray-700'} leading-none`}>
                         {day}
                       </span>
                       <div className="flex flex-col gap-0.5">

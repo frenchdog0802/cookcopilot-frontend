@@ -412,7 +412,7 @@ export function RecipeManager({
   };
 
   return <div className="flex flex-col w-full min-h-screen bg-gray-50">
-    <div className="flex-1 overflow-y-auto pb-20">
+    <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
       {/* Header */}
       <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
@@ -424,7 +424,7 @@ export function RecipeManager({
         </div>
       </header>
       {/* Main Content */}
-      <main className="flex-1 container mx-auto p-5">
+      <main className="flex-1 container mx-auto p-5 max-w-6xl">
         {!showAddRecipe && !selectedRecipe ? <>
           {/* Breadcrumb Navigation */}
           <div className="flex items-center mb-4 text-sm">
@@ -453,7 +453,7 @@ export function RecipeManager({
                 New Category
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
               {(folders ?? []).map(folder => <div key={folder.id} className="relative bg-white rounded-xl border border-gray-200 shadow-sm  hover:shadow-md transition-shadow">
                 <div className="p-4 cursor-pointer" onClick={() => setCurrentFolder(folder)}>
                   <div className="flex items-center mb-2">

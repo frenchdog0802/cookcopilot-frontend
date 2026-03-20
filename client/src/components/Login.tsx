@@ -48,7 +48,7 @@ export function Login({
     console.log(`Login with ${provider}`);
   };
   return <div className="flex flex-col w-full min-h-screen bg-gray-50">
-    <div className="flex-1 overflow-y-auto pb-20">
+    <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
       <div className="flex flex-col items-center justify-center flex-1 px-4 py-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">

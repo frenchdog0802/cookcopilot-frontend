@@ -21,6 +21,7 @@ import { connectRedis } from "./config/redis.js";
 const app = express();
 
 const allowedOrigins = [
+  "http://localhost:5174",
   "http://localhost:5173",
   "https://icy-meadow-0cd8a0c0f.3.azurestaticapps.net"
 ];

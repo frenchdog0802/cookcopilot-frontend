@@ -272,7 +272,7 @@ export function AICookingAssistant({
     });
   };
   return <div className="flex flex-col w-full min-h-screen bg-gray-50">
-    <div className="flex-1 overflow-y-auto pb-20">
+    <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
       {/* Header */}
       <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
@@ -288,7 +288,7 @@ export function AICookingAssistant({
         </div>
       </header>
       {/* Main Content */}
-      <main className="flex-1 container mx-auto p-5 flex flex-col">
+      <main className="flex-1 container mx-auto p-5 flex flex-col max-w-2xl">
         {showSavedRecipes /* Saved Recipes View */ ? <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex-1">
           <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
             <h2 className="font-semibold text-gray-800">Saved Recipes</h2>
@@ -377,7 +377,7 @@ export function AICookingAssistant({
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-6">
                 {messages.map(message => <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-2xl p-4 ${message.role === 'user' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
+                  <div className={`max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 ${message.role === 'user' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
                     <div className="whitespace-pre-line">
                       {message.content}
                     </div>

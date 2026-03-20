@@ -1,14 +1,13 @@
 // safe accessor for environments where `process` may be undefined (e.g. browsers)
 import dotenv from 'dotenv';
-dotenv.config();
+const result = dotenv.config();
 
 const safeEnv = (key) => (typeof process !== 'undefined' && process.env && process.env[key]) ? process.env[key] : undefined;
-
 
 const config = {
     env: safeEnv('NODE_ENV') || '',
     port: safeEnv('PORT') || '3000',
-    jwtSecret: safeEnv('JWT_SECRET') || "",
+    jwtSecret: process.env.JWT_SECRET,
     mongoUri: safeEnv('MONGODB_URI') || "",
     cloudinarycloudName: safeEnv('CLOUDINARY_CLOUD_NAME') || '',
     cloudinaryApiKey: safeEnv('CLOUDINARY_API_KEY') || '',

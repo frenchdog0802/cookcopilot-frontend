@@ -136,7 +136,7 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
 
     return (
         <div className="flex flex-col w-full min-h-screen bg-gray-50">
-            <div className="flex-1 overflow-y-auto pb-20">
+            <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
                 {/* Header */}
                 <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
                     <div className="container mx-auto flex justify-between items-center">
@@ -149,7 +149,7 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                 </header>
 
                 {/* Main Content */}
-                <main className="flex-1 container mx-auto p-5">
+                <main className="flex-1 container mx-auto p-5 max-w-6xl">
                     {/* Search Bar */}
                     <div className="relative mb-6">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -309,7 +309,7 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                     </div>
 
                     {/* Pantry Items List */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-4 lg:gap-3 lg:space-y-0">
                         {filteredItems.length === 0 ? (
                             <div className="bg-white rounded-xl p-6 text-center shadow-sm border border-gray-100">
                                 <PackageIcon size={32} className="mx-auto mb-2 text-gray-300" />
@@ -322,7 +322,7 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                             filteredItems.map(item => (
                                 <div key={item.name} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                                     {/* Item Header */}
-                                    <div className="p-4 pb-3">
+                                    <div className="p-3 pb-2">
                                         <div className="flex justify-between items-start mb-3">
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="font-semibold text-gray-800 capitalize truncate">{item.name}</h3>
@@ -371,8 +371,8 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                             >
                                                 <MinusIcon size={18} className="text-gray-700" />
                                             </button>
-                                            <div className="text-center min-w-[60px]">
-                                                <div className="text-2xl font-bold text-gray-800">{item.quantity}</div>
+                                            <div className="text-center min-w-[50px]">
+                                                <div className="text-xl lg:text-lg font-bold text-gray-800">{item.quantity}</div>
                                             </div>
                                             <button
                                                 onClick={() => handleUpdateQuantity(item.name, 0.5)}

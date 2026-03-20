@@ -378,6 +378,7 @@ const auth0Login = async (req, res) => {
   }
 };
 
+console.log("jwtSecret:", config.jwtSecret);
 const requireSignin = expressjwt({
   secret: config.jwtSecret,
   algorithms: ["HS256"],
