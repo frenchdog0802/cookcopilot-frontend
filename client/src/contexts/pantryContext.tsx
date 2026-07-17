@@ -4,8 +4,16 @@ import { recipeApi } from '../api/recipes';
 import { folderApi } from '../api/folder';
 import { PantryItemApi } from '../api/pantryItem';
 import { ingredientApi } from "../api/ingredient";
-import { shoppingListApi } from '../api/shoppingList';
+import { parseShoppingListItem, parseShoppingListItems, shoppingListApi } from '../api/shoppingList';
 import { mealPlanApi } from '../api/mealPlan';
+
+function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key: string): T[] {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  const list = data[key];
+  return Array.isArray(list) ? list : [];
+}
 
 interface PantryContextType {
   recipes: Recipe[];
@@ -75,9 +83,8 @@ export function PantryProvider({
   const fetchAllFolders = async () => {
     try {
       const fetchedFoldersResponse = await folderApi.list();
-      if (fetchedFoldersResponse && fetchedFoldersResponse.data && fetchedFoldersResponse.success) {
-        const fetchedFolders = fetchedFoldersResponse.data;
-        setFolders(fetchedFolders);
+      if (fetchedFoldersResponse?.success && fetchedFoldersResponse.data) {
+        setFolders(unwrapListResponse(fetchedFoldersResponse.data, 'folders'));
       }
     } catch (err) {
       console.error('Fetch folders failed:', err);
@@ -124,9 +131,11 @@ export function PantryProvider({
   const fetchAllRecipes = async () => {
     try {
       const fetchedRecipesResponse = await recipeApi.list();
-      if (fetchedRecipesResponse && fetchedRecipesResponse.data && fetchedRecipesResponse.success) {
-        console.log('Fetched recipes response:', fetchedRecipesResponse);
-        return fetchedRecipesResponse.data;
+      if (fetchedRecipesResponse?.success && fetchedRecipesResponse.data) {
+        const data = fetchedRecipesResponse.data as Recipe[] | { recipes?: Recipe[] };
+        const recipesList = unwrapListResponse(data, 'recipes');
+        setRecipes(recipesList);
+        return recipesList;
       }
     } catch (err) {
       console.error('Fetch recipes failed:', err);
@@ -182,9 +191,8 @@ export function PantryProvider({
   const fetchAllPantryItems = async () => {
     try {
       const fetchedPantryItemsResponse = await PantryItemApi.list();
-      if (fetchedPantryItemsResponse && fetchedPantryItemsResponse.data && fetchedPantryItemsResponse.success) {
-        const fetchedPantryItems = fetchedPantryItemsResponse.data;
-        setPantryItems(fetchedPantryItems);
+      if (fetchedPantryItemsResponse?.success && fetchedPantryItemsResponse.data) {
+        setPantryItems(unwrapListResponse(fetchedPantryItemsResponse.data, 'items'));
       }
     } catch (err) {
       console.error('Fetch pantry items failed:', err);
@@ -233,9 +241,8 @@ export function PantryProvider({
   const fetchAllIngredients = async (query: string | null) => {
     try {
       const fetchedIngredientsResponse = await ingredientApi.list(query || undefined);
-      if (fetchedIngredientsResponse && fetchedIngredientsResponse.data && fetchedIngredientsResponse.success) {
-        const fetchedIngredients = fetchedIngredientsResponse.data;
-        setIngredients(fetchedIngredients);
+      if (fetchedIngredientsResponse?.success && fetchedIngredientsResponse.data) {
+        setIngredients(unwrapListResponse(fetchedIngredientsResponse.data, 'ingredients'));
       }
     } catch (err) {
       console.error('Fetch ingredients failed:', err);
@@ -251,7 +258,7 @@ export function PantryProvider({
     try {
       const fetchedItemsResponse = await shoppingListApi.list();
       if (fetchedItemsResponse && fetchedItemsResponse.data && fetchedItemsResponse.success) {
-        const fetchedItems = fetchedItemsResponse.data;
+        const fetchedItems = parseShoppingListItems(fetchedItemsResponse.data);
         setShoppingList(fetchedItems);
         return fetchedItems;
       }
@@ -278,12 +285,16 @@ export function PantryProvider({
     try {
       const savedItemResponse = await shoppingListApi.create(item);
       if (savedItemResponse && savedItemResponse.data && savedItemResponse.success) {
-        const savedItem = savedItemResponse.data;
+        const savedItem = parseShoppingListItem(savedItemResponse.data);
 
-        // replace temp with the one from backend
-        setShoppingList(prev =>
-          prev.map(i => (i.id === tempItem.id ? savedItem : i))
-        );
+        if (savedItem) {
+          // replace temp with the one from backend
+          setShoppingList(prev =>
+            prev.map(i => (i.id === tempItem.id ? savedItem : i))
+          );
+        } else {
+          setShoppingList(prev => prev.filter(i => i.id !== tempItem.id));
+        }
       } else {
         // rollback if response is invalid
         setShoppingList(prev => prev.filter(i => i.id !== tempItem.id));
@@ -304,9 +315,11 @@ export function PantryProvider({
   const fetchAllMealPlans = async () => {
     try {
       const fetchedMealPlansResponse = await mealPlanApi.list();
-      if (fetchedMealPlansResponse && fetchedMealPlansResponse.data && fetchedMealPlansResponse.success) {
-        const fetchedMealPlans = fetchedMealPlansResponse.data;
-        return fetchedMealPlans;
+      if (fetchedMealPlansResponse?.success && fetchedMealPlansResponse.data) {
+        const data = fetchedMealPlansResponse.data as MealPlan[] | { mealPlans?: MealPlan[] };
+        const mealPlansList = unwrapListResponse(data, 'mealPlans');
+        setMealPlan(mealPlansList);
+        return mealPlansList;
       }
     } catch (err) {
       console.error('Fetch meal plans failed:', err);

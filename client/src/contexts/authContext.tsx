@@ -12,9 +12,9 @@ interface AuthContextType {
   loading: boolean;
   signUp: (user: User, password: string) => Promise<AuthResponse>;
   login: (email: string, password: string) => Promise<AuthResponse>;
+  googleLogin: (googleAccessToken: string) => Promise<AuthResponse>;
   logout: () => void;
   isAuthenticated: boolean;
-  googleLogin?: (token: string, onLoginSuccess: () => void) => void;
 }
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{
@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{
 }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    // Check if user is already logged in
+
     useEffect(() => {
       const checkAuth = () => {
         try {
@@ -94,32 +94,43 @@ export const AuthProvider: React.FC<{
       }
       return authResponse;
     };
+
+    const googleLogin = async (googleAccessToken: string): Promise<AuthResponse> => {
+      setLoading(true);
+      const authResponse: AuthResponse = { success: false };
+      try {
+        const response = await auth.googleLogin(googleAccessToken);
+        if (response && response.data && response.success) {
+          authHelper.authenticate(response.data.token);
+          setUser(response.data.user);
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          authResponse.success = true;
+        } else {
+          authResponse.success = false;
+          authResponse.message = response.message || 'Google login failed';
+        }
+      } catch (error) {
+        console.error('Error during Google login:', error);
+        authResponse.message = 'An error occurred during Google login';
+      } finally {
+        setLoading(false);
+      }
+      return authResponse;
+    };
+
     const logout = () => {
       setUser(null);
       authHelper.clearJWT();
       localStorage.removeItem('user');
     };
 
-    const googleLogin = (token: string, onLoginSuccess: () => void) => {
-      setLoading(true);
-      auth.googleAuthLogin(token).then((response: any) => {
-        if (response.error) {
-          setLoading(false);
-        } else {
-          setUser(response.data);
-          localStorage.setItem('user', JSON.stringify(response.data));
-          // authHelper.authenticate(response.data.token, onLoginSuccess);
-        }
-        setLoading(false);
-      });
-    };
     const value = {
       user,
       loading,
       login,
+      googleLogin,
       logout,
       isAuthenticated: !!user,
-      googleLogin,
       signUp,
     };
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -18,7 +18,6 @@ interface BottomNavProps {
 export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
   const [showMore, setShowMore] = useState(false);
 
-  /** 一級導航 */
   const primaryNav = [
     { pageId: 'home', icon: HomeIcon, label: 'Home' },
     { pageId: 'aiAssistant', icon: BotMessageSquare, label: 'AI Chat' },
@@ -26,7 +25,6 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
     { pageId: 'pantryInventory', icon: PackageIcon, label: 'Pantry' }
   ];
 
-  /** 二級導航（More） */
   const secondaryNav = [
     { pageId: 'shoppingList', icon: ShoppingCart, label: 'Shopping' },
     { pageId: 'recipeManager', icon: UtensilsIcon, label: 'Recipes' },
@@ -35,11 +33,10 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
 
   return (
     <>
-      {/* ===== 二級選單（More） ===== */}
       {showMore && (
-        <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setShowMore(false)}>
+        <div className="fixed inset-0 z-40 bg-ink/20 lg:hidden" onClick={() => setShowMore(false)}>
           <div
-            className="absolute bottom-20 left-1/2 -translate-x-1/2 w-56 bg-white rounded-xl shadow-xl p-2"
+            className="absolute bottom-20 left-1/2 -translate-x-1/2 w-56 bg-surface rounded-xl shadow-lg border border-line p-2"
             onClick={e => e.stopPropagation()}
           >
             {secondaryNav.map(item => {
@@ -51,9 +48,9 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
                     onNavigate(item.pageId);
                     setShowMore(false);
                   }}
-                  className="flex items-center w-full px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-700"
+                  className="flex items-center w-full px-3 py-2 rounded-lg hover:bg-sage/50 text-ink"
                 >
-                  <Icon size={18} className="mr-3" />
+                  <Icon size={18} className="mr-3 text-muted" />
                   <span className="text-sm font-medium">{item.label}</span>
                 </button>
               );
@@ -62,8 +59,7 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
         </div>
       )}
 
-      {/* ===== Bottom Nav ===== */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 bg-linen border-t border-line z-50 lg:hidden">
         <div className="grid grid-cols-5 h-16 max-w-screen-lg mx-auto">
           {primaryNav.map(item => {
             const Icon = item.icon;
@@ -76,8 +72,9 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
                   setShowMore(false);
                   onNavigate(item.pageId);
                 }}
-                className={`flex flex-col items-center justify-center transition-colors ${isActive ? 'text-red-600' : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                className={`flex flex-col items-center justify-center transition-colors ${
+                  isActive ? 'text-herb' : 'text-muted hover:text-ink'
+                }`}
               >
                 <Icon size={20} className={isActive ? 'stroke-[2.5]' : ''} />
                 <span className="text-[10px] mt-0.5 font-medium">{item.label}</span>
@@ -85,11 +82,11 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
             );
           })}
 
-          {/* More */}
           <button
             onClick={() => setShowMore(prev => !prev)}
-            className={`flex flex-col items-center justify-center transition-colors ${showMore ? 'text-red-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
+            className={`flex flex-col items-center justify-center transition-colors ${
+              showMore ? 'text-herb' : 'text-muted hover:text-ink'
+            }`}
           >
             <MoreHorizontal size={20} />
             <span className="text-[10px] mt-0.5 font-medium">More</span>

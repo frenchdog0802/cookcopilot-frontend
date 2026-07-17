@@ -6,7 +6,7 @@ interface NumberInputProps {
   onChange: (value: number) => void;
   min?: number;
   max?: number;
-  step?: number;    // ★ 新增 step
+  step?: number;    // ???��? step
   disabled?: boolean;
   className?: string;
 }
@@ -16,12 +16,12 @@ export function NumberInput({
   onChange,
   min = 0,
   max,
-  step = 1,          // ★ 預設每次加 1，如果你要小數改成 0.1
+  step = 1,          // ???�設毝次??1，�??��?覝�??�改??0.1
   disabled = false,
   className = ''
 }: NumberInputProps) {
 
-  const safeFixed = (num: number) => Number(num.toFixed(10)); // 避免浮點誤差
+  const safeFixed = (num: number) => Number(num.toFixed(10)); // ?��?浮�?誤差
 
   const handleIncrement = () => {
     if (disabled) return;
@@ -61,7 +61,7 @@ export function NumberInput({
       return;
     }
 
-    // 邊界檢查
+    // ?��?檢查
     if (value < min) onChange(min);
     if (max !== undefined && value > max) onChange(max);
   };
@@ -77,11 +77,11 @@ export function NumberInput({
           w-10 h-10 sm:w-12 sm:h-12
           border border-r-0
           rounded-l-lg
-          border-gray-300
+          border-line
           transition-all duration-150
           ${disabled || value <= min
-            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            : 'bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100'}
+            ? 'bg-sage/40 text-muted cursor-not-allowed'
+            : 'bg-surface text-ink hover:bg-sage/30 active:bg-sage/40'}
         `}
       >
         <MinusIcon size={18} />
@@ -100,14 +100,14 @@ export function NumberInput({
         className={`
     w-16 sm:w-20 h-10 sm:h-12
     text-center
-    border-t border-b border-gray-300
-    font-medium text-gray-800
-    bg-white
+    border-t border-b border-line
+    font-medium text-ink
+    bg-surface
     focus:outline-none
     focus:ring-0
-    focus:border-gray-300
+    focus:border-line
     transition-all duration-150
-    ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}
+    ${disabled ? 'bg-sage/40 text-muted cursor-not-allowed' : ''}
     [appearance:textfield]
     [&::-webkit-outer-spin-button]:appearance-none
     [&::-webkit-inner-spin-button]:appearance-none
@@ -124,11 +124,11 @@ export function NumberInput({
           flex items-center justify-center
           w-10 h-10 sm:w-12 sm:h-12
           rounded-r-lg
-          border border-l-0 border-gray-300
+          border border-l-0 border-line
           transition-all duration-150
           ${disabled || (max !== undefined && value >= max)
-            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            : 'bg-white text-orange-600 hover:bg-orange-50 active:bg-orange-100'}
+            ? 'bg-sage/40 text-muted cursor-not-allowed'
+            : 'bg-surface text-herb hover:bg-sage/50 active:bg-sage'}
         `}
       >
         <PlusIcon size={18} />

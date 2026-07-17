@@ -23,15 +23,12 @@ export function RecipeDetail({
   return <div className="flex flex-col w-full min-h-screen bg-gray-50">
     <div className="flex-1 overflow-y-auto pb-20">
       {/* Header */}
-      <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
-        <div className="container mx-auto flex justify-between items-center">
-          <button onClick={onBack} className="p-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Go back">
-            <ArrowLeftIcon size={24} />
-          </button>
-          <h1 className="text-xl font-bold">Recipe Details</h1>
-          <div className="w-10"></div> {/* For layout balance */}
-        </div>
-      </header>
+      <div className="container mx-auto px-5 py-6 flex items-center gap-4">
+        <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
+          <ArrowLeftIcon size={22} />
+        </button>
+        <h1 className="page-title animate-fade-in">Recipe Details</h1>
+      </div>
       {/* Recipe Image */}
       <div className="w-full h-64 relative">
         <img src={recipe.image.url} alt={recipe.meal_name} className="w-full h-full object-cover" />
@@ -39,32 +36,32 @@ export function RecipeDetail({
         <div className="absolute bottom-0 left-0 right-0 p-6">
           <h2 className="text-2xl font-bold text-white">{recipe.meal_name}</h2>
           <p className="text-white/90">
-            {/* {recipe.cookTime} mins • {recipe.difficulty} */} 100 min • Medium
+            {/* {recipe.cookTime} mins ??{recipe.difficulty} */} 100 min ??Medium
           </p>
         </div>
       </div>
       {/* Main Content */}
       <main className="flex-1 container mx-auto p-5">
-        {cooked ? <div className="bg-green-50 p-4 rounded-xl mb-6 flex items-center border border-green-100">
-          <CheckCircleIcon className="text-green-600 mr-3" size={24} />
+        {cooked ? <div className="bg-sage/50 p-4 rounded-xl mb-6 flex items-center border border-line">
+          <CheckCircleIcon className="text-herb mr-3" size={24} />
           <div>
-            <h3 className="font-semibold text-green-800">Recipe Cooked!</h3>
-            <p className="text-green-700 text-sm">
+            <h3 className="font-semibold text-herb-deep">Recipe Cooked!</h3>
+            <p className="text-herb-deep text-sm">
               Your pantry has been updated and added to your calendar
             </p>
           </div>
         </div> : null}
         {/* Ingredients Section */}
-        <section className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">Ingredients</h3>
+        <section className="mb-8 bg-surface p-6 rounded-xl shadow-sm border border-line">
+          <h3 className="text-xl font-bold text-ink mb-4">Ingredients</h3>
           <ul className="space-y-3">
             {recipe.ingredients.map((ingredient: any, index: number) => {
               const availability = checkIngredientAvailability(ingredient);
-              return <li key={index} className={`flex justify-between items-center p-3 rounded-lg ${availability === 'available' ? 'bg-red-50 border border-red-100' : 'bg-gray-50 border border-gray-100'}`}>
+              return <li key={index} className={`flex justify-between items-center p-3 rounded-lg ${availability === 'available' ? 'bg-sage/50 border border-line' : 'bg-gray-50 border border-line'}`}>
                 <span className="font-medium">
                   {ingredient.quantity} {ingredient.unit} {ingredient.name}
                 </span>
-                {availability === 'missing' && <button className="text-amber-600 flex items-center text-sm font-medium bg-white px-3 py-1 rounded-lg border border-amber-200">
+                {availability === 'missing' && <button className="text-muted flex items-center text-sm font-medium bg-surface px-3 py-1 rounded-lg border border-line">
                   <ShoppingCartIcon size={16} className="mr-1" />
                   Add to list
                 </button>}
@@ -73,14 +70,14 @@ export function RecipeDetail({
           </ul>
         </section>
         {/* Instructions Section */}
-        <section className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">Instructions</h3>
+        <section className="mb-8 bg-surface p-6 rounded-xl shadow-sm border border-line">
+          <h3 className="text-xl font-bold text-ink mb-4">Instructions</h3>
           <ol className="space-y-5">
             {recipe.instructions.map((step: any, index: number) => <li key={index} className="flex">
-              <div className="bg-red-100 rounded-full w-8 h-8 flex items-center justify-center text-red-700 font-semibold mr-4 flex-shrink-0 mt-0.5">
+              <div className="bg-sage rounded-full w-8 h-8 flex items-center justify-center text-herb-deep font-semibold mr-4 flex-shrink-0 mt-0.5">
                 {index + 1}
               </div>
-              <p className="text-gray-700">{step}</p>
+              <p className="text-ink">{step}</p>
             </li>)}
           </ol>
         </section>

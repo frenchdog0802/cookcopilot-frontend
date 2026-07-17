@@ -1,8 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ChefHatIcon, CalendarIcon, ClipboardListIcon, PackageIcon, ShoppingCartIcon, UtensilsIcon, SettingsIcon } from 'lucide-react';
+import React, { useEffect } from 'react';
+import {
+  ChefHatIcon,
+  CalendarIcon,
+  ClipboardListIcon,
+  PackageIcon,
+  ShoppingCartIcon,
+  UtensilsIcon,
+  SettingsIcon,
+  ArrowRightIcon,
+} from 'lucide-react';
 import { usePantry } from '../contexts/pantryContext';
 import { useAuth } from '../contexts/authContext';
-import { on } from 'events';
+
 interface HomeProps {
   onCookWithWhatIHave: () => void;
   onViewCalendar: () => void;
@@ -12,6 +21,7 @@ interface HomeProps {
   onSettings: () => void;
   onLogin: () => void;
 }
+
 export function Home({
   onCookWithWhatIHave,
   onViewCalendar,
@@ -27,10 +37,7 @@ export function Home({
     fetchAllPantryItems,
     fetchAllShoppingListItems
   } = usePantry();
-  const {
-    user: user,
-    loading
-  } = useAuth();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -39,112 +46,135 @@ export function Home({
     fetchAllPantryItems();
     fetchAllShoppingListItems();
   }, [user]);
-  // Count items that need to be bought (in shopping list)
+
   const itemsToBuy = shoppingList.filter(item => !item.checked).length;
 
   if (loading) {
     return (
-      <div className="flex flex-col w-full min-h-screen bg-white items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-600"></div>
-        <p className="mt-4 text-gray-600">Loading...</p>
+      <div className="flex flex-col w-full min-h-screen bg-linen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-line border-t-herb"></div>
+        <p className="mt-4 text-muted">Loading...</p>
       </div>
     );
   }
 
-  return <div className="flex flex-col w-full min-h-screen bg-white pb-20 lg:pb-0">
-    {/* Header */}
-    <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
-      <div className="container mx-auto flex justify-between items-center">
-        <h1 className="text-2xl font-bold">ManageEat</h1>
-        <div className="flex items-center">
-          {/* <button onClick={onViewCalendar} className="p-2 rounded-full hover:bg-white/20 transition-colors mr-2" aria-label="View Calendar">
-            <CalendarIcon size={24} />
-          </button> */}
-          <button onClick={onSettings} className="p-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Settings">
-            <SettingsIcon size={24} />
-          </button>
-        </div>
-      </div>
-    </header>
-    {/* Main Content */}
-    <main className="flex-1 container mx-auto p-5 flex flex-col max-w-6xl">
-      {/* User Welcome */}
-      {user && <div className="mb-6">
-        <h2 className="text-xl font-medium text-gray-800">
-          Welcome, {user.name}!
-        </h2>
-      </div>}
-      {/* Kitchen Stats */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-        <h3 className="font-medium text-gray-700 mb-4 text-lg">
-          My Kitchen Stats
-        </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-gray-50 p-4 lg:p-5 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:bg-pink-50 hover:border-pink-100 transition-colors" onClick={onPantryInventory}>
-            <div className="flex items-center">
-              <div className="text-2xl lg:text-xl font-bold text-red-600 mb-1 mr-2">
-                {pantryItems.length}
-              </div>
-              {pantryItems.length > 0 && <PackageIcon size={18} className="text-red-600" />}
-            </div>
-            <p className="text-sm text-gray-600">Items in Pantry</p>
-          </div>
-          <div className="bg-gray-50 p-4 lg:p-5 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-100 transition-colors" onClick={onShoppingList}>
-            <div className="flex items-center">
-              <div className="text-2xl lg:text-xl font-bold text-blue-600 mb-1 mr-2">
-                {itemsToBuy}
-              </div>
-              {itemsToBuy > 0 && <ShoppingCartIcon size={18} className="text-blue-600" />}
-            </div>
-            <p className="text-gray-600">Items to Buy</p>
-          </div>
-        </div>
-      </div>
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        <button onClick={onViewCalendar} className="flex flex-col items-center justify-center p-5 bg-red-50 rounded-xl border border-red-100 hover:bg-red-100 transition-colors">
-          <ClipboardListIcon size={32} className="text-red-600 mb-3" />
-          <span className="text-gray-800 font-medium">Plan Your Meals</span>
-          <span className="text-xs text-gray-500 mt-1">
-            Schedule dishes on your calendar
-          </span>
-        </button>
-        {/* <button onClick={onManagePantry} className="flex flex-col items-center justify-center p-5 bg-amber-50 rounded-xl border border-amber-100 hover:bg-amber-100 transition-colors">
-          <PackageIcon size={32} className="text-amber-600 mb-3" />
-          <span className="text-gray-800 font-medium">Inventory</span>
-          <span className="text-xs text-gray-500 mt-1">
-            Manage ingredients
-          </span>
-        </button> */}
-        {/* <button onClick={onShoppingList} className="flex flex-col items-center justify-center p-5 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors">
-          <ShoppingCartIcon size={32} className="text-blue-600 mb-3" />
-          <span className="text-gray-800 font-medium">Shopping List</span>
-          <div className="flex items-center justify-center mt-1">
-            <span className="text-xs text-gray-500">Items to Buy: </span>
-            <span className="ml-1 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
-              {itemsToBuy}
-            </span>
-          </div>
-        </button> */}
-        <button onClick={onRecipeManager} className="flex flex-col items-center justify-center p-5 bg-green-50 rounded-xl border border-green-100 hover:bg-green-100 transition-colors">
-          <UtensilsIcon size={32} className="text-green-600 mb-3" />
-          <span className="text-gray-800 font-medium">Recipes</span>
-          <span className="text-xs text-gray-500 mt-1">
-            Manage your recipes
-          </span>
+  return (
+    <div className="flex flex-col w-full min-h-screen bg-linen pb-20 lg:pb-0">
+      {/* Mobile top bar ??settings only; brand lives in hero */}
+      <div className="lg:hidden flex justify-end px-6 py-3">
+        <button
+          onClick={onSettings}
+          className="p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors"
+          aria-label="Settings"
+        >
+          <SettingsIcon size={22} />
         </button>
       </div>
-      {/* Featured Image */}
-      <div className="relative w-full h-56 lg:h-auto lg:aspect-video lg:max-h-64 rounded-2xl overflow-hidden mb-10 shadow-lg">
-        <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80" alt="Food preparation with fresh ingredients" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-        <div className="absolute bottom-0 left-0 right-0 p-6">
-          <button onClick={onCookWithWhatIHave} className="flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-red-600 font-semibold py-4 px-8 rounded-xl shadow-lg transition-colors duration-200 mx-auto">
-            <ChefHatIcon size={24} />
-            <span className="text-lg">Cook with what I have</span>
-          </button>
+
+      {/* Hero composition */}
+      <section className="relative w-full min-h-[52vh] lg:min-h-[58vh] flex flex-col">
+        <div className="absolute inset-0">
+          <img
+            src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1600&q=80"
+            alt="Fresh ingredients on a kitchen counter"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-linen via-linen/80 to-linen/30" />
         </div>
-      </div>
-    </main>
-  </div>;
+
+        <div className="relative z-10 flex flex-col flex-1 max-w-6xl mx-auto w-full px-6 lg:px-8 pt-8 lg:pt-16 pb-8 justify-end">
+          <div className="animate-fade-up">
+            <h1 className="font-display text-4xl lg:text-5xl font-semibold text-ink tracking-tight">
+              CookPlanner
+            </h1>
+            <p className="mt-3 text-lg lg:text-xl text-ink/80 max-w-md">
+              Plan dinner from what&apos;s already in your kitchen
+            </p>
+            {user && (
+              <p className="mt-1 text-sm text-muted">
+                Welcome back, {user.name}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-8 animate-fade-up" style={{ animationDelay: '0.15s' }}>
+            <button
+              onClick={onCookWithWhatIHave}
+              className="btn-primary flex items-center gap-2 text-base px-8 py-4"
+            >
+              <ChefHatIcon size={22} />
+              Cook with what I have
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Below the fold ??quiet links, no card grid */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-6 lg:px-8 py-10">
+        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm text-muted mb-8">
+          <span>{pantryItems.length} items in pantry</span>
+          <span className="text-line">|</span>
+          <span>{itemsToBuy} items to buy</span>
+        </div>
+
+        <nav className="divide-y divide-line">
+          <button
+            onClick={onViewCalendar}
+            className="w-full flex items-center justify-between py-4 text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <CalendarIcon size={20} className="text-herb" />
+              <div>
+                <span className="font-medium text-ink group-hover:text-herb transition-colors">Plan your meals</span>
+                <p className="text-sm text-muted">Schedule dishes on your calendar</p>
+              </div>
+            </div>
+            <ArrowRightIcon size={18} className="text-muted group-hover:text-herb transition-colors" />
+          </button>
+
+          <button
+            onClick={onPantryInventory}
+            className="w-full flex items-center justify-between py-4 text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <PackageIcon size={20} className="text-herb" />
+              <div>
+                <span className="font-medium text-ink group-hover:text-herb transition-colors">Pantry</span>
+                <p className="text-sm text-muted">{pantryItems.length} ingredients tracked</p>
+              </div>
+            </div>
+            <ArrowRightIcon size={18} className="text-muted group-hover:text-herb transition-colors" />
+          </button>
+
+          <button
+            onClick={onShoppingList}
+            className="w-full flex items-center justify-between py-4 text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <ShoppingCartIcon size={20} className="text-herb" />
+              <div>
+                <span className="font-medium text-ink group-hover:text-herb transition-colors">Shopping list</span>
+                <p className="text-sm text-muted">{itemsToBuy} items to buy</p>
+              </div>
+            </div>
+            <ArrowRightIcon size={18} className="text-muted group-hover:text-herb transition-colors" />
+          </button>
+
+          <button
+            onClick={onRecipeManager}
+            className="w-full flex items-center justify-between py-4 text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <UtensilsIcon size={20} className="text-herb" />
+              <div>
+                <span className="font-medium text-ink group-hover:text-herb transition-colors">Recipes</span>
+                <p className="text-sm text-muted">Manage your recipe collection</p>
+              </div>
+            </div>
+            <ArrowRightIcon size={18} className="text-muted group-hover:text-herb transition-colors" />
+          </button>
+        </nav>
+      </main>
+    </div>
+  );
 }

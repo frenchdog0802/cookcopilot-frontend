@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Home } from './components/Home';
 import { Calendar } from './components/Calendar';
 import { PantryInventory } from './components/PantryInventory';
@@ -11,12 +12,14 @@ import { Loading } from './components/Loading';
 import { PantryProvider } from './contexts/pantryContext';
 import { AuthProvider, useAuth } from './contexts/authContext';
 import { AICookingAssistant } from './components/AICookingAssistant';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BottomNav } from './components/BottomNav';
 import { Sidebar } from './components/Sidebar';
 
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
+
 function AppContent() {
-  const [currentView, setCurrentView] = useState('home');
+  const [currentView, setCurrentView] = useState('aiAssistant');
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const {
     isAuthenticated,
     loading
@@ -68,7 +71,7 @@ function AppContent() {
   if (loading) {
     return <Loading fullScreen />;
   }
-  return <div className="w-full min-h-screen bg-gray-50">
+  return <div className="w-full min-h-screen bg-linen">
     {/* Desktop Sidebar — hidden on mobile */}
     {currentView !== 'login' && currentView !== 'signup' && (
       <Sidebar activeView={currentView} onNavigate={handleNavigate} />
@@ -78,9 +81,26 @@ function AppContent() {
     <div className={currentView !== 'login' && currentView !== 'signup' ? 'lg:pl-60' : ''}>
       {currentView === 'login' && <Login onLoginSuccess={navigateToHome} onSignUp={navigateToSignUp} />}
       {currentView === 'home' && isAuthenticated && <Home onLogin={navigateToLogin} onCookWithWhatIHave={navigateToAiAssistant} onViewCalendar={navigateToCalendar} onPantryInventory={navigateToPantryInventory} onShoppingList={navigateToShoppingList} onRecipeManager={navigateToRecipeManager} onSettings={navigateToSettings} />}
-      {currentView === 'aiAssistant' && isAuthenticated && <AICookingAssistant onBack={navigateToHome} />}
+      {currentView === 'aiAssistant' && isAuthenticated && (
+        <AICookingAssistant
+          onBack={navigateToHome}
+          onViewRecipe={(recipeId) => {
+            setSelectedRecipeId(recipeId);
+            setCurrentView('recipeManager');
+          }}
+          onViewShoppingList={navigateToShoppingList}
+          onViewCalendar={navigateToCalendar}
+          onViewPantry={navigateToPantryInventory}
+        />
+      )}
       {currentView === 'calendar' && isAuthenticated && <Calendar onBack={navigateToHome} />}
-      {currentView === 'recipeManager' && isAuthenticated && <RecipeManager onBack={navigateToHome} />}
+      {currentView === 'recipeManager' && isAuthenticated && (
+        <RecipeManager
+          onBack={navigateToHome}
+          selectedRecipeId={selectedRecipeId}
+          onSelectedRecipeHandled={() => setSelectedRecipeId(null)}
+        />
+      )}
       {currentView === 'settings' && isAuthenticated && <Settings onBack={navigateToHome} />}
       {currentView === 'pantryInventory' && isAuthenticated && <PantryInventory onBack={navigateToHome} />}
       {currentView === 'shoppingList' && isAuthenticated && <ShoppingList onBack={navigateToHome} />}
@@ -94,12 +114,13 @@ function AppContent() {
   </div>;
 }
 export function App() {
-  return <AuthProvider>
-    <PantryProvider>
-      {/*vite config  */}
-      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
-        <AppContent />
-      </GoogleOAuthProvider>
-    </PantryProvider>
-  </AuthProvider>;
+  return (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <AuthProvider>
+        <PantryProvider>
+          <AppContent />
+        </PantryProvider>
+      </AuthProvider>
+    </GoogleOAuthProvider>
+  );
 }

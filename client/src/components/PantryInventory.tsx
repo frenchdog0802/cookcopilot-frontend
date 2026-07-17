@@ -28,15 +28,15 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
     });
     const [showDropdown, setShowDropdown] = useState(false);
     const [isAddingItem, setIsAddingItem] = useState(false);
-    const [selectedIndex, setSelectedIndex] = useState(-1);  // 新增：鍵盤導航索引
+    const [selectedIndex, setSelectedIndex] = useState(-1);  // ???????????????
 
-    // Pantry item search dropdown（直接用 name，鉤子內 debounce）
+    // Pantry item search dropdown????? name???? debounce??
     const { filteredIngredients: filteredPantryIngredients, loading: pantryLoading } = useSearchIngredients(
         newItem.name,
         ingredients
     );
 
-    // Auto-select if exactly one match and exact name match（用 useMemo 優化，避免循環）
+    // Auto-select if exactly one match and exact name match?? useMemo ?????????????
     const autoSelectLogic = useMemo(() => {
         if (filteredPantryIngredients.length === 1) {
             const match = filteredPantryIngredients[0];
@@ -76,7 +76,7 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
         setPantryItems(oriPantryItems);
     }, [oriPantryItems]);
 
-    // 新增輔助函數：選擇成分
+    // ?????????????????
     const handleSelectIngredient = (ingredient: IngredientEntry) => {
         setNewItem({
             name: ingredient.name,
@@ -135,32 +135,29 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
     };
 
     return (
-        <div className="flex flex-col w-full min-h-screen bg-gray-50">
+        <div className="flex flex-col w-full min-h-screen bg-linen">
             <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
-                {/* Header */}
-                <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
-                    <div className="container mx-auto flex justify-between items-center">
-                        <button onClick={onBack} className="p-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Go back">
-                            <ArrowLeftIcon size={24} />
-                        </button>
-                        <h1 className="text-xl font-bold">Kitchen Inventory</h1>
-                        <div className="w-10"></div> {/* For layout balance */}
-                    </div>
-                </header>
+                {/* Page title */}
+                <div className="max-w-6xl mx-auto px-6 lg:px-8 py-6 flex items-center gap-4">
+                    <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
+                        <ArrowLeftIcon size={22} />
+                    </button>
+                    <h1 className="page-title animate-fade-in">Kitchen Inventory</h1>
+                </div>
 
                 {/* Main Content */}
-                <main className="flex-1 container mx-auto p-5 max-w-6xl">
+                <main className="flex-1 max-w-6xl mx-auto w-full px-6 lg:px-8 py-6">
                     {/* Search Bar */}
                     <div className="relative mb-6">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <SearchIcon size={18} className="text-gray-400" />
+                            <SearchIcon size={18} className="text-muted" />
                         </div>
                         <input
                             type="text"
                             placeholder="Search ingredients..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-line focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent"
                         />
                     </div>
 
@@ -168,14 +165,14 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                     {!isAddingItem ? (
                         <button
                             onClick={() => setIsAddingItem(true)}
-                            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium py-3 px-4 rounded-xl mb-6 shadow-sm transition-colors"
+                            className="w-full flex items-center justify-center gap-2 bg-surface border border-line hover:bg-linen text-ink font-medium py-3 px-4 rounded-xl mb-6 shadow-sm transition-colors"
                         >
                             <PlusIcon size={18} />
                             <span>Add New Item</span>
                         </button>
                     ) : (
-                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
-                            <h3 className="font-medium text-gray-700 mb-3">Add New Item</h3>
+                        <div className="bg-surface p-4 rounded-xl shadow-sm border border-line mb-6">
+                            <h3 className="font-medium text-ink mb-3">Add New Item</h3>
 
                             <div className="space-y-3 relative">
                                 <input
@@ -186,7 +183,7 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                         const newName = e.target.value;
                                         setNewItem({ ...newItem, name: newName });
                                         setShowDropdown(newName.length > 0);
-                                        setSelectedIndex(-1);  // 重置選擇
+                                        setSelectedIndex(-1);  // ???????
                                     }}
                                     onKeyDown={(e) => {
                                         if (!showDropdown || filteredPantryIngredients.length === 0) return;
@@ -219,37 +216,37 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                     onBlur={() => {
                                         setTimeout(() => setShowDropdown(false), 200);
                                     }}
-                                    className="w-full p-2 border border-gray-200 rounded-lg"
+                                    className="w-full p-2 border border-line rounded-lg"
                                 />
 
                                 {showDropdown && (
-                                    <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
+                                    <ul className="absolute z-10 w-full bg-surface border border-line rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
                                         {pantryLoading ? (
-                                            <li className="p-3 text-center text-gray-500 text-sm flex items-center justify-center">
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500 mr-2"></div>
+                                            <li className="p-3 text-center text-muted text-sm flex items-center justify-center">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-herb mr-2"></div>
                                                 Loading...
                                             </li>
                                         ) : filteredPantryIngredients.length > 0 ? (
                                             filteredPantryIngredients.map((ingredient: IngredientEntry, index: number) => {
                                                 const isSelected = index === selectedIndex;
-                                                // 高亮匹配文字（簡單實現）
+                                                // ???????????????????
                                                 const query = newItem.name.toLowerCase();
                                                 const highlightedName = ingredient.name.replace(
                                                     new RegExp(`(${query})`, 'gi'),
                                                     '<mark class="bg-yellow-200">$1</mark>'
                                                 );
                                                 return (
-                                                    <li key={ingredient.id} className={`p-3 ${isSelected ? 'bg-red-50' : 'hover:bg-red-50'}`}>
+                                                    <li key={ingredient.id} className={`p-3 ${isSelected ? 'bg-sage/50' : 'hover:bg-sage/50'}`}>
                                                         <button
                                                             onClick={() => handleSelectIngredient(ingredient)}
                                                             className={`w-full text-left ${isSelected ? 'font-medium' : ''}`}
-                                                            dangerouslySetInnerHTML={{ __html: highlightedName + ` <span class="text-sm text-gray-400">(${ingredient.default_unit})</span>` }}
+                                                            dangerouslySetInnerHTML={{ __html: highlightedName + ` <span class="text-sm text-muted">(${ingredient.default_unit})</span>` }}
                                                         />
                                                     </li>
                                                 );
                                             })
                                         ) : (
-                                            <li className="p-3 text-center text-gray-500 text-sm">
+                                            <li className="p-3 text-center text-muted text-sm">
                                                 No matching ingredients. Try typing more letters.
                                             </li>
                                         )}
@@ -274,15 +271,15 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                         placeholder="Unit (g, ml, etc.)"
                                         value={newItem.unit}
                                         onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                                        className="w-2/3 p-2 border border-gray-200 rounded-lg"
+                                        className="w-2/3 p-2 border border-line rounded-lg"
                                     />
                                 </div>
 
                                 <div className="flex gap-2">
-                                    <button onClick={() => handleCancelAddItem()} className="w-1/2 bg-gray-100 text-gray-700 py-2 rounded-lg">
+                                    <button onClick={() => handleCancelAddItem()} className="w-1/2 bg-sage/40 text-ink py-2 rounded-lg">
                                         Cancel
                                     </button>
-                                    <button onClick={handleAddItem} className="w-1/2 bg-red-600 text-white py-2 rounded-lg">
+                                    <button onClick={handleAddItem} className="w-1/2 bg-herb text-white py-2 rounded-lg">
                                         Add Item
                                     </button>
                                 </div>
@@ -291,95 +288,86 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                     )}
 
                     {/* Legend */}
-                    <div className="bg-white rounded-xl p-3 mb-4 shadow-sm border border-gray-100">
+                    <div className="bg-surface rounded-xl p-3 mb-4 shadow-sm border border-line">
                         <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                <span className="text-gray-600 font-medium">Planned</span>
+                                <div className="w-2 h-2 rounded-full bg-sage/500"></div>
+                                <span className="text-muted font-medium">Planned</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                                <span className="text-gray-600 font-medium">To Buy</span>
+                                <div className="w-2 h-2 rounded-full bg-sage/500"></div>
+                                <span className="text-muted font-medium">To Buy</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                <span className="text-gray-600 font-medium">Pantry</span>
+                                <div className="w-2 h-2 rounded-full bg-sage/500"></div>
+                                <span className="text-muted font-medium">Pantry</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Pantry Items List */}
-                    <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-4 lg:gap-3 lg:space-y-0">
+                    <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-4 lg:gap-3 lg:space-y-0 lg:auto-rows-fr">
                         {filteredItems.length === 0 ? (
-                            <div className="bg-white rounded-xl p-6 text-center shadow-sm border border-gray-100">
-                                <PackageIcon size={32} className="mx-auto mb-2 text-gray-300" />
-                                <p className="text-gray-500 text-sm">No items found</p>
+                            <div className="bg-surface rounded-xl p-6 text-center shadow-sm border border-line">
+                                <PackageIcon size={32} className="mx-auto mb-2 text-muted/40" />
+                                <p className="text-muted text-sm">No items found</p>
                                 {searchQuery && (
-                                    <p className="text-gray-400 text-xs mt-1">Try a different search term</p>
+                                    <p className="text-muted text-xs mt-1">Try a different search term</p>
                                 )}
                             </div>
                         ) : (
                             filteredItems.map(item => (
-                                <div key={item.name} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div key={item.name} className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden flex flex-col">
                                     {/* Item Header */}
-                                    <div className="p-3 pb-2">
-                                        <div className="flex justify-between items-start mb-3">
+                                    <div className="p-3 pb-2 flex-1 flex flex-col">
+                                        <div className="flex justify-between items-center mb-2">
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="font-semibold text-gray-800 capitalize truncate">{item.name}</h3>
-                                                <p className="text-xs text-gray-500 mt-0.5">{item.unit}</p>
+                                                <h3 className="font-semibold text-ink capitalize truncate text-sm">{item.name}</h3>
+                                                <p className="text-[11px] text-muted mt-0.5">{item.unit}</p>
                                             </div>
                                             <button
                                                 onClick={() => handleRemoveItem(item.name)}
-                                                className="p-2 rounded-lg hover:bg-red-50 active:bg-red-100 text-red-500 transition-colors -mr-2"
+                                                className="p-1.5 rounded-lg hover:bg-sage/50 active:bg-sage text-muted hover:text-herb transition-colors -mr-1"
                                                 aria-label="Remove item"
                                             >
-                                                <TrashIcon size={16} />
+                                                <TrashIcon size={14} />
                                             </button>
                                         </div>
 
                                         {/* Status Grid */}
-                                        <div className="grid grid-cols-3 gap-2 mb-3">
-                                            <div className="bg-blue-50 rounded-lg p-2 text-center border border-blue-100">
-                                                <div className="flex items-center justify-center gap-1 mb-1">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                                                    <span className="text-xs font-medium text-blue-700">Planned</span>
-                                                </div>
-                                                <span className="text-sm font-semibold text-blue-900">{item.item_planned || 0}</span>
+                                        <div className="grid grid-cols-3 gap-1.5 mb-2">
+                                            <div className="bg-sage/50 rounded-md p-1.5 text-center border border-blue-100">
+                                                <span className="text-[10px] font-medium text-herb block mb-0.5">Planned</span>
+                                                <span className="text-sm font-bold text-blue-900">{item.item_planned || 0}</span>
                                             </div>
-                                            <div className="bg-amber-50 rounded-lg p-2 text-center border border-amber-100">
-                                                <div className="flex items-center justify-center gap-1 mb-1">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
-                                                    <span className="text-xs font-medium text-amber-700">To Buy</span>
-                                                </div>
-                                                <span className="text-sm font-semibold text-amber-900">{item.item_to_buy || 0}</span>
+                                            <div className="bg-sage/50 rounded-md p-1.5 text-center border border-amber-100">
+                                                <span className="text-[10px] font-medium text-muted block mb-0.5">To Buy</span>
+                                                <span className="text-sm font-bold text-amber-900">{item.item_to_buy || 0}</span>
                                             </div>
-                                            <div className="bg-green-50 rounded-lg p-2 text-center border border-green-100">
-                                                <div className="flex items-center justify-center gap-1 mb-1">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                                    <span className="text-xs font-medium text-green-700">Pantry</span>
-                                                </div>
-                                                <span className="text-sm font-semibold text-green-900">{item.quantity || 0}</span>
+                                            <div className="bg-sage/50 rounded-md p-1.5 text-center border border-line">
+                                                <span className="text-[10px] font-medium text-herb block mb-0.5">Pantry</span>
+                                                <span className="text-sm font-bold text-green-900">{item.quantity || 0}</span>
                                             </div>
                                         </div>
 
                                         {/* Quantity Controls */}
-                                        <div className="flex items-center justify-center gap-3 pt-2 border-t border-gray-100">
+                                        <div className="flex items-center justify-center gap-3 pt-2 mt-auto border-t border-line">
                                             <button
                                                 onClick={() => handleUpdateQuantity(item.name, -0.5)}
-                                                className="p-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 transition-colors"
+                                                className="p-2 rounded-lg bg-sage/40 hover:bg-sage/60 active:bg-sage transition-colors"
                                                 aria-label="Decrease quantity"
                                             >
-                                                <MinusIcon size={18} className="text-gray-700" />
+                                                <MinusIcon size={16} className="text-ink" />
                                             </button>
-                                            <div className="text-center min-w-[50px]">
-                                                <div className="text-xl lg:text-lg font-bold text-gray-800">{item.quantity}</div>
+                                            <div className="text-center min-w-[40px]">
+                                                <div className="text-lg font-bold text-ink leading-none">{item.quantity}</div>
                                             </div>
                                             <button
                                                 onClick={() => handleUpdateQuantity(item.name, 0.5)}
-                                                className="p-2.5 rounded-lg bg-red-500 hover:bg-red-600 active:bg-red-700 transition-colors"
+                                                className="p-2 rounded-lg bg-herb hover:bg-herb active:bg-herb-deep transition-colors"
                                                 aria-label="Increase quantity"
                                             >
-                                                <PlusIcon size={18} className="text-white" />
+                                                <PlusIcon size={16} className="text-white" />
                                             </button>
                                         </div>
                                     </div>

@@ -1,0 +1,180 @@
+import { api } from './client';
+
+export type ChatResponseType =
+    | 'text'
+    | 'recipe_created'
+    | 'recipe_imported'
+    | 'recipe_updated'
+    | 'shopping_list_updated'
+    | 'meal_plan_updated'
+    | 'pantry_updated'
+    | 'meal_suggestions'
+    | 'multi_action'
+    | 'action_result'
+    | 'error';
+
+export interface ChatRequest {
+    message: string;
+    recipeContext?: {
+        recipeId: string;
+        recipeName: string;
+    };
+}
+
+export interface ChatResponse {
+    type: ChatResponseType;
+    message: string;
+    data?: Record<string, unknown>;
+}
+
+export interface HistoryMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    createdAt: number;
+}
+
+export interface StreamSendHandlers {
+    onToken: (token: string) => void;
+    onDone: (response: ChatResponse) => void;
+    onError: (message: string) => void;
+}
+
+export const CARD_RESPONSE_TYPES: ChatResponseType[] = [
+    'recipe_created',
+    'recipe_imported',
+    'recipe_updated',
+    'shopping_list_updated',
+    'meal_plan_updated',
+    'pantry_updated',
+    'meal_suggestions',
+    'multi_action',
+    'action_result',
+];
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+
+function getAuthToken(): string {
+    const stored = localStorage.getItem('jwt');
+    if (!stored) return '';
+    try {
+        return JSON.parse(stored) as string;
+    } catch {
+        return stored;
+    }
+}
+
+function decodeSseData(data: string): string {
+    if (!data) return '';
+    try {
+        const parsed: unknown = JSON.parse(data);
+        if (typeof parsed === 'string') {
+            return parsed;
+        }
+    } catch {
+        // Fall through to raw data when not JSON.
+    }
+    return data;
+}
+
+function parseSseEvent(block: string, handlers: StreamSendHandlers) {
+    const lines = block.split('\n');
+    let eventName = 'message';
+    const dataLines: string[] = [];
+
+    for (const line of lines) {
+        if (line.startsWith('event:')) {
+            eventName = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5).trimStart());
+        }
+    }
+
+    const data = dataLines.join('\n');
+    if (!data) return;
+
+    if (eventName === 'token') {
+        handlers.onToken(decodeSseData(data));
+        return;
+    }
+
+    if (eventName === 'done') {
+        handlers.onDone(JSON.parse(data) as ChatResponse);
+        return;
+    }
+
+    if (eventName === 'error') {
+        try {
+            const parsed = JSON.parse(data) as { message?: string };
+            handlers.onError(parsed.message ?? 'Something went wrong. Please try again.');
+        } catch {
+            handlers.onError(data);
+        }
+    }
+}
+
+async function consumeSseStream(
+    body: ReadableStream<Uint8Array>,
+    handlers: StreamSendHandlers,
+    signal?: AbortSignal,
+) {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+        if (signal?.aborted) {
+            await reader.cancel();
+            throw new DOMException('Stream aborted', 'AbortError');
+        }
+
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() ?? '';
+
+        for (const eventBlock of events) {
+            if (eventBlock.trim()) {
+                parseSseEvent(eventBlock, handlers);
+            }
+        }
+    }
+
+    if (buffer.trim()) {
+        parseSseEvent(buffer, handlers);
+    }
+}
+
+export const chatApi = {
+    send: (data: ChatRequest) => api.post<ChatResponse>('/api/chat/send', data),
+    streamSend: async (data: ChatRequest, handlers: StreamSendHandlers, signal?: AbortSignal) => {
+        const token = getAuthToken();
+        const response = await fetch(`${BASE_URL}/api/chat/stream`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'text/event-stream',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(data),
+            signal,
+        });
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            handlers.onError(text || `Stream request failed (${response.status})`);
+            return;
+        }
+
+        if (!response.body) {
+            handlers.onError('Stream response had no body');
+            return;
+        }
+
+        await consumeSseStream(response.body, handlers, signal);
+    },
+    getHistory: () => api.get<{ messages: HistoryMessage[] }>('/api/chat/history'),
+    getActions: () => api.get<{ actions: string[]; description: string }>('/api/chat/actions'),
+};

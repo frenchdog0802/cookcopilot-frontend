@@ -1,44 +1,102 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { ArrowLeftIcon, SendIcon, SaveIcon, RefreshCwIcon, ThumbsUpIcon, ShoppingCartIcon, ChevronRightIcon, FolderIcon, XIcon, ChevronDownIcon, MessageSquareIcon, PlusCircleIcon, SearchIcon } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { ArrowLeftIcon, SendIcon, SaveIcon, RefreshCwIcon, ShoppingCartIcon, ChevronRightIcon, FolderIcon, XIcon, MessageSquareIcon, PlusCircleIcon } from 'lucide-react';
 import { usePantry } from '../contexts/pantryContext';
-import { IngredientEntry, PantryItem, Recipe, RecipeSuggestion } from '../api/types';
+import { chatApi, ChatResponse, HistoryMessage } from '../api/chat';
+import { mealPlanApi } from '../api/mealPlan';
+import { RecipeSuggestion } from '../api/types';
+
 interface AICookingAssistantProps {
   onBack: () => void;
+  onViewRecipe?: (recipeId: string) => void;
+  onViewShoppingList?: () => void;
+  onViewCalendar?: () => void;
+  onViewPantry?: () => void;
 }
+
 type MessageType =
   | 'text'
-  | 'recipe'
+  | 'recipe_created'
+  | 'recipe_imported'
+  | 'recipe_updated'
+  | 'shopping_list_updated'
+  | 'meal_plan_updated'
+  | 'pantry_updated'
+  | 'meal_suggestions'
+  | 'multi_action'
+  | 'action_result'
   | 'system'
   | 'confirmation'
   | 'error';
-// Define message types
+
+interface ResponseCardData {
+  recipeId?: string;
+  recipeName?: string;
+  ingredientCount?: number;
+  steps?: string[];
+  sourceUrl?: string;
+  imported?: boolean;
+  itemsAdded?: number;
+  items?: Array<{ name: string; quantity?: string | number; unit?: string }>;
+  mealPlanId?: string;
+  mealType?: string;
+  servingDate?: string;
+  mealsScheduled?: number;
+  meals?: Array<{ meal_name?: string; serving_date?: string; meal_type?: string }>;
+  mergedGroups?: number;
+  removedDuplicates?: number;
+  suggestions?: Array<{ recipeId?: string; recipeName?: string; matchScore?: number; missingIngredients?: string[] }>;
+  actionCount?: number;
+  actions?: Array<Record<string, unknown>>;
+  message?: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   type?: MessageType;
   content: string;
   timestamp: number;
+  cardData?: ResponseCardData;
+  streaming?: boolean;
 }
+
+const WELCOME_MESSAGE: Message = {
+  id: 'welcome',
+  role: 'assistant',
+  content: 'Hi! Tell me what you need — import a recipe URL, plan your week, update your pantry, or ask what you can cook. I\'ll handle it and show you what changed.',
+  timestamp: Date.now(),
+};
+
+const SUGGESTED_PROMPTS = [
+  'What can I cook with what I have?',
+  'Plan dinners for the rest of this week',
+  'Import a recipe from a URL',
+  'Add chicken, rice, and broccoli to my pantry',
+  'Organize my pantry',
+];
+
 export function AICookingAssistant({
-  onBack
+  onBack,
+  onViewRecipe,
+  onViewShoppingList,
+  onViewCalendar,
+  onViewPantry,
 }: AICookingAssistantProps) {
   const {
-    pantryItems,
-    recipes,
-    addRecipe
+    addRecipe,
+    fetchAllRecipes,
+    fetchAllShoppingListItems,
+    fetchAllPantryItems,
+    fetchAllMealPlans,
   } = usePantry();
-  const [messages, setMessages] = useState<Message[]>([{
-    id: 'welcome',
-    role: 'assistant',
-    content: 'Hi! I can help you cook with what you have. What would you like to make today?',
-    timestamp: Date.now()
-  }]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showSavedRecipes, setShowSavedRecipes] = useState(false);
   const [savedRecipes, setSavedRecipes] = useState<RecipeSuggestion[]>([]);
   const [suggestedRecipes, setSuggestedRecipes] = useState<RecipeSuggestion[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeSuggestion | null>(null);
+  const [addingToMenuRecipeId, setAddingToMenuRecipeId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Load saved recipes from localStorage
@@ -57,6 +115,28 @@ export function AICookingAssistant({
   useEffect(() => {
     localStorage.setItem('aiSavedRecipes', JSON.stringify(savedRecipes));
   }, [savedRecipes]);
+  // Load chat history on mount
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const response = await chatApi.getHistory();
+        if (response.success && response.data?.messages?.length) {
+          const historyMessages = response.data.messages.map((entry: HistoryMessage) => ({
+            id: entry.id,
+            role: entry.role,
+            content: entry.content.replace(/^\[Pantry context:[^\]]*\]\s*/i, '').trim() || entry.content,
+            timestamp: entry.createdAt * 1000,
+          }));
+          setMessages(historyMessages);
+        }
+      } catch (error) {
+        console.error('Failed to load chat history', error);
+      }
+    };
+
+    loadHistory();
+  }, []);
+
   // Scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
@@ -67,126 +147,176 @@ export function AICookingAssistant({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-  // Generate a response based on user input
-  const generateResponse = (userInput: string) => {
-    setIsTyping(true);
-    // Simulate typing delay
-    setTimeout(() => {
-      const availableIngredients = pantryItems.map(item => item.name.toLowerCase());
-      const userInputLower = userInput.toLowerCase();
-      // Determine if user is asking about specific ingredients
-      const mentionedIngredients = availableIngredients.filter(ingredient => userInputLower.includes(ingredient));
-      let response = '';
-      let suggestedRecipesList: RecipeSuggestion[] = [];
-      // Check if user is asking for recipe suggestions
-      if (userInputLower.includes('recipe') || userInputLower.includes('make') || userInputLower.includes('cook') || userInputLower.includes('suggest') || userInputLower.includes('idea')) {
-        // Filter recipes based on available ingredients
-        const cookNowRecipes = recipes.filter(recipe => recipe.ingredients.every(ingredient => pantryItems.some(item => item.name.toLowerCase() === ingredient.name.toLowerCase() && item.quantity >= ingredient.quantity)));
-        const needsOneItemRecipes = recipes.filter(recipe => {
-          const missingIngredients = recipe.ingredients.filter(ingredient => !pantryItems.some(item => item.name.toLowerCase() === ingredient.name.toLowerCase() && item.quantity >= ingredient.quantity));
-          return missingIngredients.length === 1;
-        });
-        // Generate response based on available recipes
-        if (cookNowRecipes.length > 0) {
-          response = `Based on what you have in your pantry, you can make these recipes:\n\n`;
-          // Convert to our RecipeSuggestion format
-          suggestedRecipesList = cookNowRecipes.map(recipe => ({
-            id: `suggestion-${recipe.id}`,
-            mealName: recipe.meal_name,
-            ingredients: recipe.ingredients,
-            instructions: recipe.instructions,
-            cookTime: recipe.cookTime,
-            image: recipe.image ?? undefined
-          }));
-          // Add to response
-          suggestedRecipesList.forEach((recipe, index) => {
-            response += `${index + 1}. ${recipe.mealName}\n`;
-          });
-          if (needsOneItemRecipes.length > 0) {
-            response += `\nYou're also just one ingredient away from making these:\n\n`;
-            // Add almost-there recipes to suggestions
-            const almostThereRecipes = needsOneItemRecipes.map(recipe => {
-              const missingIngredient = recipe.ingredients.find(ingredient => !pantryItems.some(item => item.name.toLowerCase() === ingredient.name.toLowerCase() && item.quantity >= ingredient.quantity));
-              return {
-                id: `suggestion-${recipe.id}`,
-                mealName: recipe.meal_name,
-                ingredients: recipe.ingredients,
-                instructions: recipe.instructions,
-                cookTime: recipe.cookTime,
-                image: recipe.image ?? undefined,
-                // @ts-ignore: allow extra property for UI
-                missingIngredient
-              };
-            });
-            suggestedRecipesList = [...suggestedRecipesList, ...almostThereRecipes];
-            // Add to response
-            almostThereRecipes.forEach((recipe, index) => {
-              response += `${index + 1}. ${recipe.mealName} (missing: ${recipe.missingIngredient?.name})\n`;
-            });
-          }
-        } else if (needsOneItemRecipes.length > 0) {
-          response = `You're just one ingredient away from making these recipes:\n\n`;
-          // Convert to our RecipeSuggestion format
-          suggestedRecipesList = needsOneItemRecipes.map(recipe => {
-            const missingIngredient = recipe.ingredients.find(ingredient => !pantryItems.some(item => item.name.toLowerCase() === ingredient.name.toLowerCase() && item.quantity >= ingredient.quantity));
-            return {
-              id: `suggestion-${recipe.id}`,
-              mealName: recipe.meal_name,
-              ingredients: recipe.ingredients,
-              instructions: recipe.instructions,
-              cookTime: recipe.cookTime,
-              // difficulty: recipe.difficulty,
-              image: recipe.image ?? undefined,
-              missingIngredient
-            };
-          });
-          // Add to response
-          suggestedRecipesList.forEach((recipe, index) => {
-            response += `${index + 1}. ${recipe.mealName} (missing: ${recipe.missingIngredient})\n`;
-          });
-        } else {
-          response = "I don't see any recipes that match your current pantry items. Consider adding more ingredients to your pantry, or tell me what specific ingredients you'd like to cook with.";
-        }
-      }
-      // Check if user is asking about specific ingredients
-      else if (mentionedIngredients.length > 0) {
-        response = `I see you have ${mentionedIngredients.join(', ')} in your pantry. `;
-        // Filter recipes that use these ingredients
-        const relevantRecipes = recipes.filter(recipe => recipe.ingredients.some(ingredient => mentionedIngredients.includes(ingredient.name.toLowerCase())));
-        if (relevantRecipes.length > 0) {
-          response += `You could use ${mentionedIngredients.length > 1 ? 'these' : 'this'} to make:\n\n`;
-          // Convert to our RecipeSuggestion format
-          suggestedRecipesList = relevantRecipes.map(recipe => ({
-            id: `suggestion-${recipe.id}`,
-            mealName: recipe.meal_name,
-            ingredients: recipe.ingredients,
-            instructions: recipe.instructions,
-            cookTime: recipe.cookTime,
-            image: recipe.image ?? undefined,
-          }));
-          // Add to response
-          suggestedRecipesList.forEach((recipe, index) => {
-            response += `${index + 1}. ${recipe.mealName}\n`;
-          });
-        } else {
-          response += `I don't have specific recipes for these ingredients yet. Would you like me to suggest some common uses for them?`;
-        }
-      }
-      // Default response
-      else {
-        response = `I'm here to help you cook with what you have in your pantry. You currently have ${pantryItems.length} items in your pantry. Would you like me to suggest recipes based on these ingredients? Or you can ask about specific ingredients.`;
-      }
-      // Add the response as a message
-      const newMessage: Message = {
-        id: `assistant-${Date.now()}`,
+  const mapResponseToMessage = (response: ChatResponse): Message => {
+    const cardTypes: MessageType[] = [
+      'recipe_created', 'recipe_imported', 'recipe_updated',
+      'shopping_list_updated', 'meal_plan_updated', 'pantry_updated',
+      'meal_suggestions', 'multi_action', 'action_result',
+    ];
+    const cardData = response.data as ResponseCardData | undefined;
+    return {
+      id: `assistant-${Date.now()}`,
+      role: 'assistant',
+      type: response.type === 'error' ? 'error' : response.type as MessageType,
+      content: response.message,
+      timestamp: Date.now(),
+      cardData: cardTypes.includes(response.type as MessageType) ? cardData : undefined,
+    };
+  };
+
+  const refreshAfterAgentAction = async (type: MessageType) => {
+    const tasks: Promise<unknown>[] = [];
+    if (['recipe_created', 'recipe_imported', 'recipe_updated', 'meal_suggestions', 'multi_action', 'action_result'].includes(type)) {
+      tasks.push(fetchAllRecipes());
+    }
+    if (['meal_plan_updated', 'meal_suggestions', 'multi_action', 'action_result'].includes(type)) {
+      tasks.push(fetchAllMealPlans());
+    }
+    if (['pantry_updated', 'meal_suggestions', 'multi_action', 'action_result'].includes(type)) {
+      tasks.push(fetchAllPantryItems());
+    }
+    if (['shopping_list_updated', 'meal_plan_updated', 'multi_action', 'action_result'].includes(type)) {
+      tasks.push(fetchAllShoppingListItems());
+    }
+    await Promise.all(tasks);
+  };
+
+  const handleAddCreatedRecipeToMenu = async (recipeId: string) => {
+    setAddingToMenuRecipeId(recipeId);
+    try {
+      await mealPlanApi.create({ recipe_id: recipeId, meal_type: 'dinner' });
+      const confirmationMessage: Message = {
+        id: `confirmation-${Date.now()}`,
         role: 'assistant',
-        content: response,
-        timestamp: Date.now()
+        content: 'Recipe added to your dinner menu.',
+        timestamp: Date.now(),
       };
-      setMessages(prevMessages => [...prevMessages, newMessage]);
-      setSuggestedRecipes(suggestedRecipesList);
+      setMessages(prev => [...prev, confirmationMessage]);
+    } catch (error) {
+      console.error('Failed to add recipe to menu', error);
+    } finally {
+      setAddingToMenuRecipeId(null);
+    }
+  };
+
+  const handleViewCreatedRecipe = async (recipeId: string) => {
+    await fetchAllRecipes();
+    onViewRecipe?.(recipeId);
+  };
+
+  const handleViewCalendar = async () => {
+    await fetchAllMealPlans();
+    onViewCalendar?.();
+  };
+
+  const handleViewPantry = async () => {
+    await fetchAllPantryItems();
+    onViewPantry?.();
+  };
+
+  const handleViewShoppingList = async () => {
+    await fetchAllShoppingListItems();
+    onViewShoppingList?.();
+  };
+
+  const renderRecipeCard = (message: Message, label = 'Recipe') => (
+    <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+      <h3 className="font-medium text-ink">{label}: {message.cardData?.recipeName}</h3>
+      <p className="text-sm text-muted mt-1">
+        {message.cardData?.ingredientCount ?? 0} ingredients · {(message.cardData?.steps ?? []).length} steps
+      </p>
+      {message.cardData?.sourceUrl && (
+        <p className="text-xs text-muted mt-1 truncate">From: {message.cardData.sourceUrl}</p>
+      )}
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={() => message.cardData?.recipeId && handleViewCreatedRecipe(message.cardData.recipeId)}
+          className="flex-1 bg-sage/40 text-ink py-2 rounded-lg text-sm"
+        >
+          Edit Recipe
+        </button>
+        <button
+          onClick={() => message.cardData?.recipeId && handleAddCreatedRecipeToMenu(message.cardData.recipeId)}
+          disabled={addingToMenuRecipeId === message.cardData?.recipeId}
+          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm disabled:opacity-60"
+        >
+          Add to Menu
+        </button>
+      </div>
+    </div>
+  );
+
+  // Generate a streaming response from the backend
+  const generateResponse = async (userInput: string) => {
+    const assistantId = `assistant-${Date.now()}`;
+    const streamingMessage: Message = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      streaming: true,
+    };
+
+    setMessages(prev => [...prev, streamingMessage]);
+    setIsTyping(true);
+
+    try {
+      await chatApi.streamSend(
+        { message: userInput },
+        {
+          onToken: (token) => {
+            setMessages(prev => prev.map(message =>
+              message.id === assistantId
+                ? { ...message, content: message.content + token }
+                : message
+            ));
+          },
+          onDone: async (response) => {
+            const finalized = mapResponseToMessage(response);
+            setMessages(prev => prev.map(message =>
+              message.id === assistantId
+                ? {
+                    ...finalized,
+                    id: assistantId,
+                    timestamp: message.timestamp,
+                    streaming: false,
+                  }
+                : message
+            ));
+            if (finalized.type && finalized.type !== 'text' && finalized.type !== 'error') {
+              await refreshAfterAgentAction(finalized.type);
+            }
+            setSuggestedRecipes([]);
+          },
+          onError: (message) => {
+            setMessages(prev => prev.map(entry =>
+              entry.id === assistantId
+                ? {
+                    ...entry,
+                    type: 'error',
+                    content: message || "I'm sorry, I'm having trouble connecting to my cooking brain right now. Please try again in a moment.",
+                    streaming: false,
+                  }
+                : entry
+            ));
+          },
+        },
+      );
+    } catch (error) {
+      console.error('Chat stream error:', error);
+      setMessages(prev => prev.map(message =>
+        message.id === assistantId
+          ? {
+              ...message,
+              type: 'error',
+              content: "I'm sorry, I'm having trouble connecting to my cooking brain right now. Please try again in a moment.",
+              streaming: false,
+            }
+          : message
+      ));
+    } finally {
       setIsTyping(false);
-    }, 1000);
+    }
   };
   // Handle sending a message
   const handleSendMessage = () => {
@@ -222,12 +352,7 @@ export function AICookingAssistant({
   };
   // Handle clearing the chat
   const handleClearChat = () => {
-    setMessages([{
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Hi! I can help you cook with what you have. What would you like to make today?',
-      timestamp: Date.now()
-    }]);
+    setMessages([WELCOME_MESSAGE]);
     setSuggestedRecipes([]);
     setSelectedRecipe(null);
   };
@@ -238,19 +363,19 @@ export function AICookingAssistant({
   // Handle adding a recipe to the cooking app
   const handleAddToRecipes = (recipe: RecipeSuggestion) => {
     // Format recipe for the cooking app
-    const newRecipe = {
-      date: new Date().toISOString().split('T')[0],
-      mealName: recipe.mealName,
+    // Using cast to any to satisfy the complex Recipe type while providing essential fields
+    const newRecipe: any = {
+      id: `ai-recipe-${Date.now()}`,
+      folder_id: 'ai-suggestions',
+      meal_name: recipe.mealName || recipe.name,
       instructions: recipe.instructions,
       cookTime: recipe.cookTime,
-      // difficulty: recipe.difficulty,
-      ingredients: recipe.ingredients.map((ing: PantryItem) => ({
+      ingredients: recipe.ingredients.map((ing: any) => ({
         name: ing.name,
         quantity: ing.quantity,
         unit: ing.unit,
       })),
-      image: recipe.image || null,
-      folderId: 'ai-suggestions'
+      image: recipe.image ? { public_id: 'ai-gen', url: recipe.image } : null
     };
     // Add to recipes
     addRecipe(newRecipe);
@@ -271,67 +396,65 @@ export function AICookingAssistant({
       minute: '2-digit'
     });
   };
-  return <div className="flex flex-col w-full min-h-screen bg-gray-50">
+  return <div className="flex flex-col w-full min-h-screen bg-linen">
     <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
-        <div className="container mx-auto flex justify-between items-center">
-          <button onClick={onBack} className="p-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Go back">
-            <ArrowLeftIcon size={24} />
+      {/* Page title */}
+      <div className="max-w-2xl mx-auto px-6 lg:px-8 py-6 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
+            <ArrowLeftIcon size={22} />
           </button>
-          <h1 className="text-xl font-bold">AI Cooking Assistant</h1>
-          <div className="flex items-center">
-            <button onClick={() => setShowSavedRecipes(!showSavedRecipes)} className={`p-2 rounded-full ${showSavedRecipes ? 'bg-white/20' : 'hover:bg-white/20'} transition-colors`} aria-label={showSavedRecipes ? 'Show chat' : 'Show saved recipes'}>
-              {showSavedRecipes ? <MessageSquareIcon size={24} /> : <FolderIcon size={24} />}
-            </button>
-          </div>
+          <h1 className="page-title animate-fade-in">AI Cooking Assistant</h1>
         </div>
-      </header>
+        <button onClick={() => setShowSavedRecipes(!showSavedRecipes)} className={`p-2 rounded-lg ${showSavedRecipes ? 'bg-sage text-herb' : 'text-muted hover:text-ink hover:bg-sage/50'} transition-colors`} aria-label={showSavedRecipes ? 'Show chat' : 'Show saved recipes'}>
+          {showSavedRecipes ? <MessageSquareIcon size={22} /> : <FolderIcon size={22} />}
+        </button>
+      </div>
       {/* Main Content */}
-      <main className="flex-1 container mx-auto p-5 flex flex-col max-w-2xl">
-        {showSavedRecipes /* Saved Recipes View */ ? <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex-1">
-          <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-            <h2 className="font-semibold text-gray-800">Saved Recipes</h2>
-            <button onClick={() => setShowSavedRecipes(false)} className="p-1 rounded-full hover:bg-gray-200" aria-label="Close">
-              <XIcon size={18} className="text-gray-500" />
+      <main className="flex-1 max-w-2xl mx-auto w-full px-6 lg:px-8 py-6 flex flex-col">
+        {showSavedRecipes /* Saved Recipes View */ ? <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden flex-1">
+          <div className="p-4 border-b border-line bg-linen flex justify-between items-center">
+            <h2 className="font-semibold text-ink">Saved Recipes</h2>
+            <button onClick={() => setShowSavedRecipes(false)} className="p-1 rounded-full hover:bg-sage/60" aria-label="Close">
+              <XIcon size={18} className="text-muted" />
             </button>
           </div>
-          {savedRecipes.length === 0 ? <div className="p-8 text-center text-gray-500">
-            <FolderIcon size={48} className="mx-auto mb-4 text-gray-300" />
+          {savedRecipes.length === 0 ? <div className="p-8 text-center text-muted">
+            <FolderIcon size={48} className="mx-auto mb-4 text-muted/40" />
             <p>No saved recipes yet</p>
             <p className="text-sm mt-2">
               Ask the AI for recipe suggestions and save them here
             </p>
-          </div> : <div className="divide-y divide-gray-100">
-            {savedRecipes.map(recipe => <div key={recipe.id} className="p-4 hover:bg-gray-50">
+          </div> : <div className="divide-y divide-line">
+            {savedRecipes.map(recipe => <div key={recipe.id} className="p-4 hover:bg-linen">
               <div className="flex justify-between">
                 <div className="flex-1 cursor-pointer" onClick={() => setSelectedRecipe(recipe)}>
-                  <h3 className="font-medium text-gray-800">
+                  <h3 className="font-medium text-ink">
                     {recipe.mealName}
                   </h3>
-                  <p className="text-gray-500 text-sm">
-                    {recipe.ingredients.length} ingredients • Saved{' '}
+                  <p className="text-muted text-sm">
+                    {recipe.ingredients.length} ingredients ??Saved{' '}
                     {new Date(recipe.savedAt || Date.now()).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex space-x-2">
-                  <button onClick={() => handleAddToRecipes(recipe)} className="p-1.5 rounded-full hover:bg-blue-50 text-blue-600" aria-label="Add to recipes" title="Add to recipes">
+                  <button onClick={() => handleAddToRecipes(recipe)} className="p-1.5 rounded-full hover:bg-sage/50 text-herb" aria-label="Add to recipes" title="Add to recipes">
                     <PlusCircleIcon size={18} />
                   </button>
-                  <button onClick={() => handleRemoveSavedRecipe(recipe.id)} className="p-1.5 rounded-full hover:bg-red-50 text-red-500" aria-label="Remove recipe" title="Remove from saved">
+                  <button onClick={() => handleRemoveSavedRecipe(recipe.id)} className="p-1.5 rounded-full hover:bg-sage/50 text-herb" aria-label="Remove recipe" title="Remove from saved">
                     <XIcon size={18} />
                   </button>
                 </div>
               </div>
             </div>)}
           </div>}
-        </div> : selectedRecipe /* Recipe Detail View */ ? <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex-1">
-          <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-            <h2 className="font-semibold text-gray-800">
+        </div> : selectedRecipe /* Recipe Detail View */ ? <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden flex-1">
+          <div className="p-4 border-b border-line bg-linen flex justify-between items-center">
+            <h2 className="font-semibold text-ink">
               {selectedRecipe.mealName}
             </h2>
-            <button onClick={() => setSelectedRecipe(null)} className="p-1 rounded-full hover:bg-gray-200" aria-label="Close">
-              <XIcon size={18} className="text-gray-500" />
+            <button onClick={() => setSelectedRecipe(null)} className="p-1 rounded-full hover:bg-sage/60" aria-label="Close">
+              <XIcon size={18} className="text-muted" />
             </button>
           </div>
           <div className="p-6">
@@ -339,10 +462,10 @@ export function AICookingAssistant({
               <img src={selectedRecipe.image} alt={selectedRecipe.mealName} className="w-full h-full object-cover" />
             </div>}
             <div className="mb-6">
-              <h3 className="font-medium text-gray-700 mb-2">Ingredients</h3>
+              <h3 className="font-medium text-ink mb-2">Ingredients</h3>
               <ul className="space-y-2">
-                {selectedRecipe.ingredients.map((ingredient: IngredientEntry, index: number) => <li key={index} className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
+                {selectedRecipe.ingredients.map((ingredient: any, index: number) => <li key={index} className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-herb mr-2"></div>
                   <span>
                     {ingredient.quantity} {ingredient.unit}{' '}
                     {ingredient.name}
@@ -351,18 +474,18 @@ export function AICookingAssistant({
               </ul>
             </div>
             <div className="mb-6">
-              <h3 className="font-medium text-gray-700 mb-2">Instructions</h3>
+              <h3 className="font-medium text-ink mb-2">Instructions</h3>
               <ol className="space-y-3">
                 {selectedRecipe.instructions.map((step: string, index: number) => <li key={index} className="flex">
-                  <div className="bg-red-100 rounded-full w-6 h-6 flex items-center justify-center text-red-700 font-medium mr-3 flex-shrink-0 mt-0.5">
+                  <div className="bg-sage rounded-full w-6 h-6 flex items-center justify-center text-herb-deep font-medium mr-3 flex-shrink-0 mt-0.5">
                     {index + 1}
                   </div>
-                  <p className="text-gray-700">{step}</p>
+                  <p className="text-ink">{step}</p>
                 </li>)}
               </ol>
             </div>
             <div className="flex gap-2 pt-4">
-              <button onClick={() => setSelectedRecipe(null)} className="w-1/2 bg-gray-100 text-gray-700 py-2 rounded-lg">
+              <button onClick={() => setSelectedRecipe(null)} className="w-1/2 bg-sage/40 text-ink py-2 rounded-lg">
                 Back
               </button>
               <button onClick={() => handleAddToRecipes(selectedRecipe)} className="w-1/2 bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center">
@@ -372,42 +495,161 @@ export function AICookingAssistant({
             </div>
           </div>
         </div> /* Chat View */ : <>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex-1 flex flex-col">
+          <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden flex-1 flex flex-col">
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-6">
                 {messages.map(message => <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 ${message.role === 'user' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
+                  <div className={`max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 ${message.role === 'user' ? 'bg-herb text-white' : message.type === 'error' ? 'bg-sage/50 text-herb-deep border border-line' : 'bg-sage/40 text-ink'}`}>
                     <div className="whitespace-pre-line">
-                      {message.content}
+                      {message.streaming && !message.content ? (
+                        <div className="flex space-x-1.5 py-1">
+                          <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:0ms]" />
+                          <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:150ms]" />
+                          <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:300ms]" />
+                        </div>
+                      ) : (
+                        <>
+                          {message.content}
+                          {message.streaming && (
+                            <span
+                              aria-hidden="true"
+                              className="inline-block w-0.5 h-[1.1em] ml-0.5 bg-herb align-text-bottom animate-pulse"
+                            />
+                          )}
+                        </>
+                      )}
                     </div>
-                    <div className={`text-xs mt-1 ${message.role === 'user' ? 'text-red-100' : 'text-gray-500'}`}>
+                    {message.type === 'recipe_created' && message.cardData && renderRecipeCard(message)}
+                    {message.type === 'recipe_imported' && message.cardData && renderRecipeCard(message, 'Imported recipe')}
+                    {message.type === 'recipe_updated' && message.cardData && (
+                      <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+                        <p className="font-medium text-ink">Updated: {message.cardData.recipeName}</p>
+                        <button
+                          onClick={() => message.cardData?.recipeId && handleViewCreatedRecipe(message.cardData.recipeId)}
+                          className="w-full mt-3 bg-sage/40 text-ink py-2 rounded-lg text-sm"
+                        >
+                          Edit Recipe
+                        </button>
+                      </div>
+                    )}
+                    {message.type === 'shopping_list_updated' && message.cardData && (
+                      <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+                        <p className="font-medium text-ink">
+                          Added {message.cardData.itemsAdded ?? 0} items to your shopping list
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {(message.cardData.items ?? []).map((item, index) => (
+                            <span key={`${item.name}-${index}`} className="text-xs bg-sage/50 text-herb-deep px-2 py-1 rounded-full">
+                              {item.name}
+                            </span>
+                          ))}
+                        </div>
+                        <button
+                          onClick={handleViewShoppingList}
+                          className="w-full mt-3 bg-herb text-white py-2 rounded-lg text-sm"
+                        >
+                          View Shopping List
+                        </button>
+                      </div>
+                    )}
+                    {message.type === 'meal_plan_updated' && message.cardData && (
+                      <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+                        <p className="font-medium text-ink">
+                          {message.cardData.mealsScheduled
+                            ? `Scheduled ${message.cardData.mealsScheduled} meal(s)`
+                            : message.cardData.recipeName
+                              ? `${message.cardData.recipeName} — ${message.cardData.mealType} on ${message.cardData.servingDate}`
+                              : 'Meal plan updated'}
+                        </p>
+                        {(message.cardData.meals ?? []).length > 0 && (
+                          <ul className="mt-2 text-sm text-muted space-y-1">
+                            {message.cardData.meals!.map((meal, index) => (
+                              <li key={index}>
+                                {meal.meal_name} · {meal.meal_type} · {meal.serving_date}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <button onClick={handleViewCalendar} className="w-full mt-3 bg-herb text-white py-2 rounded-lg text-sm">
+                          Open Calendar
+                        </button>
+                      </div>
+                    )}
+                    {message.type === 'pantry_updated' && message.cardData && (
+                      <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+                        <p className="font-medium text-ink">
+                          {message.cardData.removedDuplicates != null
+                            ? `Pantry organized — merged ${message.cardData.mergedGroups ?? 0} group(s)`
+                            : `Added ${message.cardData.itemsAdded ?? 0} item(s) to pantry`}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {(message.cardData.items ?? []).map((item, index) => (
+                            <span key={`${item.name}-${index}`} className="text-xs bg-sage/50 text-herb-deep px-2 py-1 rounded-full">
+                              {item.name}
+                            </span>
+                          ))}
+                        </div>
+                        <button onClick={handleViewPantry} className="w-full mt-3 bg-herb text-white py-2 rounded-lg text-sm">
+                          Open Pantry
+                        </button>
+                      </div>
+                    )}
+                    {message.type === 'meal_suggestions' && message.cardData && (
+                      <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+                        <p className="font-medium text-ink mb-2">Meal suggestions</p>
+                        <ul className="space-y-2">
+                          {(message.cardData.suggestions ?? []).map((s, index) => (
+                            <li key={index} className="text-sm text-ink flex justify-between">
+                              <span>{s.recipeName}</span>
+                              <span className="text-muted">{s.matchScore}% match</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <button onClick={handleViewCalendar} className="w-full mt-3 bg-sage/40 text-ink py-2 rounded-lg text-sm">
+                          View Calendar
+                        </button>
+                      </div>
+                    )}
+                    {message.type === 'multi_action' && message.cardData && (
+                      <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+                        <p className="font-medium text-ink">
+                          Completed {message.cardData.actionCount ?? 0} action(s)
+                        </p>
+                        <ul className="mt-2 text-sm text-muted space-y-1">
+                          {(message.cardData.actions ?? []).map((action, index) => (
+                            <li key={index}>{String(action.message ?? action.tool ?? 'Action')}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <div className={`text-xs mt-1 ${message.role === 'user' ? 'text-white/70' : message.type === 'error' ? 'text-herb' : 'text-muted'}`}>
                       {formatTimestamp(message.timestamp)}
                     </div>
                   </div>
                 </div>)}
                 {/* Show suggested recipes if available */}
                 {suggestedRecipes.length > 0 && <div className="flex justify-start">
-                  <div className="max-w-[80%] bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                    <h3 className="font-medium text-gray-800 mb-2">
+                  <div className="max-w-[80%] bg-surface border border-line rounded-2xl p-4 shadow-sm">
+                    <h3 className="font-medium text-ink mb-2">
                       Suggested Recipes
                     </h3>
                     <div className="space-y-3">
-                      {suggestedRecipes.map(recipe => <div key={recipe.id} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
+                      {suggestedRecipes.map(recipe => <div key={recipe.id} className="border border-line rounded-lg p-3 hover:bg-linen">
                         <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-medium text-gray-700">
+                          <h4 className="font-medium text-ink">
                             {recipe.mealName}
                           </h4>
                           <div className="flex space-x-1">
-                            <button onClick={() => setSelectedRecipe(recipe)} className="p-1 rounded-full hover:bg-gray-200 text-gray-600" title="View recipe">
+                            <button onClick={() => setSelectedRecipe(recipe)} className="p-1 rounded-full hover:bg-sage/60 text-muted" title="View recipe">
                               <ChevronRightIcon size={16} />
                             </button>
-                            <button onClick={() => handleSaveRecipe(recipe)} className="p-1 rounded-full hover:bg-blue-50 text-blue-600" title="Save recipe">
+                            <button onClick={() => handleSaveRecipe(recipe)} className="p-1 rounded-full hover:bg-sage/50 text-herb" title="Save recipe">
                               <SaveIcon size={16} />
                             </button>
                           </div>
                         </div>
-                        {recipe.missingIngredient && <div className="flex items-center text-amber-600 text-xs">
+                        {recipe.missingIngredient && <div className="flex items-center text-muted text-xs">
                           <ShoppingCartIcon size={12} className="mr-1" />
                           <span>
                             Missing: {recipe.missingIngredient.name}
@@ -417,22 +659,13 @@ export function AICookingAssistant({
                     </div>
                   </div>
                 </div>}
-                {isTyping && <div className="flex justify-start">
-                  <div className="max-w-[80%] bg-gray-100 rounded-2xl p-4">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></div>
-                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse delay-100"></div>
-                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse delay-200"></div>
-                    </div>
-                  </div>
-                </div>}
                 <div ref={messagesEndRef} />
               </div>
             </div>
             {/* Input Area */}
-            <div className="border-t border-gray-100 p-4">
+            <div className="border-t border-line p-4">
               <div className="flex items-center gap-2">
-                <button onClick={handleClearChat} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full" title="Clear chat">
+                <button onClick={handleClearChat} className="p-2 text-muted hover:text-ink hover:bg-sage/50 rounded-full" title="Clear chat">
                   <RefreshCwIcon size={20} />
                 </button>
                 <div className="relative flex-1">
@@ -441,22 +674,18 @@ export function AICookingAssistant({
                       e.preventDefault();
                       handleSendMessage();
                     }
-                  }} placeholder="Ask for recipe suggestions..." className="w-full py-3 px-4 pr-12 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" disabled={isTyping} />
-                  <button onClick={handleSendMessage} disabled={!inputValue.trim() || isTyping} className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-red-600 hover:text-red-700 disabled:text-gray-400">
+                  }} placeholder="Ask CookPlanner to plan, import, or organize..." className="w-full py-3 px-4 pr-12 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent" disabled={isTyping} />
+                  <button onClick={handleSendMessage} disabled={!inputValue.trim() || isTyping} aria-label="Send message" className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-herb hover:text-herb-deep disabled:text-muted">
                     <SendIcon size={20} />
                   </button>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-2 justify-center">
-                <button onClick={() => setInputValue('What can I make with what I have?')} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full">
-                  What can I make?
-                </button>
-                <button onClick={() => setInputValue('I have chicken, what can I cook?')} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full">
-                  Recipes with chicken
-                </button>
-                <button onClick={() => setInputValue('Suggest a quick dinner idea')} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full">
-                  Quick dinner idea
-                </button>
+                {SUGGESTED_PROMPTS.map((prompt) => (
+                  <button key={prompt} onClick={() => setInputValue(prompt)} className="text-xs bg-sage/40 hover:bg-sage/60 text-ink px-3 py-1 rounded-full">
+                    {prompt}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

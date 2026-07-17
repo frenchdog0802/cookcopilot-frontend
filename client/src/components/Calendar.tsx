@@ -119,15 +119,15 @@ export function Calendar({
   const getMealTypeColor = (type: string) => {
     switch (type) {
       case 'breakfast':
-        return 'bg-blue-50 border-blue-100 text-blue-700';
+        return 'bg-sage/50 border-blue-100 text-blue-700';
       case 'lunch':
-        return 'bg-amber-50 border-amber-100 text-amber-700';
+        return 'bg-sage/50 border-amber-100 text-muted';
       case 'dinner':
-        return 'bg-red-50 border-red-100 text-red-700';
+        return 'bg-sage/50 border-line text-herb-deep';
       case 'snack':
-        return 'bg-green-50 border-green-100 text-green-700';
+        return 'bg-sage/50 border-line text-herb-deep';
       default:
-        return 'bg-gray-50 border-gray-100 text-gray-700';
+        return 'bg-linen border-line text-ink';
     }
   };
   const getMealTypeLabel = (type: string) => {
@@ -137,15 +137,15 @@ export function Calendar({
   const getMealTypeIndicatorColor = (type: string) => {
     switch (type) {
       case 'breakfast':
-        return 'bg-blue-500';
+        return 'bg-sage/500';
       case 'lunch':
-        return 'bg-amber-500';
+        return 'bg-sage/500';
       case 'dinner':
-        return 'bg-red-500';
+        return 'bg-herb';
       case 'snack':
-        return 'bg-green-500';
+        return 'bg-sage/500';
       default:
-        return 'bg-gray-500';
+        return 'bg-linen0';
     }
   };
 
@@ -375,31 +375,31 @@ export function Calendar({
     }
   }, [currentWeekStart]);
 
-  return <div className="flex flex-col w-full min-h-screen bg-gray-50">
+  return <div className="flex flex-col w-full min-h-screen bg-linen">
     <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 lg:left-60 bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-md z-50">
-        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <button onClick={onBack} className="p-2 rounded-full hover:bg-white/20 transition-colors active:bg-white/30" aria-label="Go back">
+      {/* Page title */}
+      <div className="max-w-6xl mx-auto px-6 lg:px-8 py-6 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
             <ArrowLeftIcon size={20} />
           </button>
-          <h1 className="text-xl font-bold">Cooking Calendar</h1>
-          <button onClick={() => handleOpenAddRecipe(new Date())} className="p-2 rounded-full hover:bg-white/20 transition-colors active:bg-white/30" aria-label="Add Recipe">
-            <PlusIcon size={20} />
-          </button>
+          <h1 className="page-title animate-fade-in">Cooking Calendar</h1>
         </div>
-      </header>
+        <button onClick={() => handleOpenAddRecipe(new Date())} className="p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Add Recipe">
+          <PlusIcon size={20} />
+        </button>
+      </div>
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pt-14 px-4 pb-4 max-w-6xl mx-auto">
+      <main className="flex-1 overflow-y-auto max-w-6xl mx-auto w-full px-6 lg:px-8 pb-4">
         {/* View Toggle */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 mb-2 mt-2">
+        <div className="bg-surface rounded-xl shadow-sm border border-line p-2 mb-2 mt-2">
           <div className="flex justify-between items-center mb-3">
             <div className="flex space-x-2">
-              <button onClick={() => setViewMode('calendar')} className={`px-4 py-2 rounded-xl flex items-center text-sm font-medium transition-all ${viewMode === 'calendar' ? 'bg-red-500 text-white shadow-sm' : 'bg-gray-50 text-gray-600'}`}>
+              <button onClick={() => setViewMode('calendar')} className={`px-4 py-2 rounded-xl flex items-center text-sm font-medium transition-all ${viewMode === 'calendar' ? 'bg-herb text-white shadow-sm' : 'bg-linen text-muted'}`}>
                 <CalendarIcon size={18} className="mr-1.5" />
                 Month
               </button>
-              <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-xl flex items-center text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-red-500 text-white shadow-sm' : 'bg-gray-50 text-gray-600'}`}>
+              <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-xl flex items-center text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-herb text-white shadow-sm' : 'bg-linen text-muted'}`}>
                 <ListIcon size={18} className="mr-1.5" />
                 Week
               </button>
@@ -407,13 +407,13 @@ export function Calendar({
           </div>
           {viewMode === 'calendar' && <>
             <div className="flex justify-between items-center">
-              <button onClick={previousMonth} className="p-2 rounded-xl hover:bg-gray-50 text-gray-700 active:bg-gray-100 transition-colors" aria-label="Previous month">
+              <button onClick={previousMonth} className="p-2 rounded-xl hover:bg-linen text-ink active:bg-sage/40 transition-colors" aria-label="Previous month">
                 <ChevronLeftIcon size={20} />
               </button>
-              <h2 className="text-base font-semibold text-gray-800">
+              <h2 className="text-base font-semibold text-ink">
                 {monthNames[currentMonth]} {currentYear}
               </h2>
-              <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-gray-50 text-gray-700 active:bg-gray-100 transition-colors" aria-label="Next month">
+              <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-linen text-ink active:bg-sage/40 transition-colors" aria-label="Next month">
                 <ChevronRightIcon size={20} />
               </button>
             </div>
@@ -421,7 +421,7 @@ export function Calendar({
             <div className="mt-4">
               {/* Day names */}
               <div className="grid grid-cols-7 mb-1">
-                {dayNames.map(day => <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                {dayNames.map(day => <div key={day} className="text-center text-xs font-medium text-muted py-1">
                   {day}
                 </div>)}
               </div>
@@ -443,19 +443,19 @@ export function Calendar({
                   return <div key={index} onClick={() => handleDayClick(day)} className={`
                           aspect-square lg:aspect-auto lg:min-h-[4.5rem] p-1.5 lg:p-2 relative flex flex-col justify-between
                           ${day ? 'cursor-pointer active:scale-95' : ''}
-                          ${isSelected ? 'bg-red-50 border-2 border-red-400' : day ? 'bg-white border border-gray-100' : 'bg-transparent'}
-                          ${isToday && !isSelected ? 'border-2 border-red-300' : ''}
+                          ${isSelected ? 'bg-sage/50 border-2 border-herb' : day ? 'bg-surface border border-line' : 'bg-transparent'}
+                          ${isToday && !isSelected ? 'border-2 border-herb/50' : ''}
                           rounded-lg transition-all duration-150
                         `}>
                     {day && <>
-                      <span className={`text-center text-sm lg:text-base ${isToday ? 'font-bold text-red-600' : 'text-gray-700'} leading-none`}>
+                      <span className={`text-center text-sm lg:text-base ${isToday ? 'font-bold text-herb' : 'text-ink'} leading-none`}>
                         {day}
                       </span>
                       <div className="flex flex-col gap-0.5">
-                        {hasMealTypes.breakfast && <div className="h-0.5 bg-blue-500 rounded-full"></div>}
-                        {hasMealTypes.lunch && <div className="h-0.5 bg-amber-500 rounded-full"></div>}
-                        {hasMealTypes.dinner && <div className="h-0.5 bg-red-500 rounded-full"></div>}
-                        {hasMealTypes.snack && <div className="h-0.5 bg-green-500 rounded-full"></div>}
+                        {hasMealTypes.breakfast && <div className="h-0.5 bg-sage/500 rounded-full"></div>}
+                        {hasMealTypes.lunch && <div className="h-0.5 bg-sage/500 rounded-full"></div>}
+                        {hasMealTypes.dinner && <div className="h-0.5 bg-herb rounded-full"></div>}
+                        {hasMealTypes.snack && <div className="h-0.5 bg-sage/500 rounded-full"></div>}
                       </div>
                     </>}
                   </div>;
@@ -467,19 +467,19 @@ export function Calendar({
           {viewMode === 'list' && <div className="mt-2">
             {/* Week Navigation Controls */}
             <div className="flex justify-between items-center mb-3">
-              <button onClick={goToPreviousWeek} className="flex items-center text-gray-700 hover:text-gray-900 px-2 py-1.5 rounded-lg hover:bg-gray-50 active:bg-gray-100 text-sm">
+              <button onClick={goToPreviousWeek} className="flex items-center text-ink hover:text-ink px-2 py-1.5 rounded-lg hover:bg-linen active:bg-sage/40 text-sm">
                 <ChevronLeftIcon size={16} className="mr-0.5" />
                 Prev
               </button>
               <div className="flex items-center">
-                <button onClick={goToCurrentWeek} className="px-3 py-1.5 text-xs rounded-lg bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 active:bg-blue-200 font-medium">
+                <button onClick={goToCurrentWeek} className="px-3 py-1.5 text-xs rounded-lg bg-sage/50 text-herb border border-blue-100 hover:bg-sage active:bg-blue-200 font-medium">
                   Today
                 </button>
-                <span className="mx-2 text-sm font-medium text-gray-700">
+                <span className="mx-2 text-sm font-medium text-ink">
                   {getWeekRangeDisplay()}
                 </span>
               </div>
-              <button onClick={goToNextWeek} className="flex items-center text-gray-700 hover:text-gray-900 px-2 py-1.5 rounded-lg hover:bg-gray-50 active:bg-gray-100 text-sm">
+              <button onClick={goToNextWeek} className="flex items-center text-ink hover:text-ink px-2 py-1.5 rounded-lg hover:bg-linen active:bg-sage/40 text-sm">
                 Next
                 <ChevronRightIcon size={16} className="ml-0.5" />
               </button>
@@ -489,29 +489,29 @@ export function Calendar({
               {Object.entries(getWeekViewData()).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime()).map(([date, items]) => {
                 const isExpanded = expandedDateGroups.includes(date);
                 const hasItems = Array.isArray(items) && items.length > 0;
-                return <div key={date} className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-                  <div className={`px-3 py-2.5 flex justify-between items-center cursor-pointer active:bg-gray-100 transition-colors ${hasItems ? 'bg-gray-50' : 'bg-white'}`} onClick={() => toggleDateGroupExpansion(date)}>
+                return <div key={date} className="border border-line rounded-xl overflow-hidden bg-surface">
+                  <div className={`px-3 py-2.5 flex justify-between items-center cursor-pointer active:bg-sage/40 transition-colors ${hasItems ? 'bg-linen' : 'bg-surface'}`} onClick={() => toggleDateGroupExpansion(date)}>
                     <div className="flex items-center">
-                      <CalendarIcon size={16} className="text-gray-500 mr-2" />
-                      <h3 className="font-medium text-sm text-gray-800">
+                      <CalendarIcon size={16} className="text-muted mr-2" />
+                      <h3 className="font-medium text-sm text-ink">
                         {formatDisplayDate(date)}
                       </h3>
-                      {hasItems && <span className="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                      {hasItems && <span className="ml-2 bg-sage text-herb-deep text-xs px-2 py-0.5 rounded-full font-medium">
                         {items.length}
                       </span>}
                     </div>
-                    {hasItems && (isExpanded ? <ChevronUpIcon size={18} className="text-gray-500" /> : <ChevronDownIcon size={18} className="text-gray-500" />)}
+                    {hasItems && (isExpanded ? <ChevronUpIcon size={18} className="text-muted" /> : <ChevronDownIcon size={18} className="text-muted" />)}
                   </div>
-                  {isExpanded && hasItems && <div className="divide-y divide-gray-100">
-                    {items.map((item: MealPlan) => <div key={`${item.recipe_id}-${item.serving_date}-${item.meal_type}`} className="p-3 hover:bg-gray-50">
+                  {isExpanded && hasItems && <div className="divide-y divide-line">
+                    {items.map((item: MealPlan) => <div key={`${item.recipe_id}-${item.serving_date}-${item.meal_type}`} className="p-3 hover:bg-linen">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center flex-1 min-w-0">
                           <div className={`w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0 ${getMealTypeIndicatorColor(item.meal_type)}`}></div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium text-sm text-gray-800 truncate">
+                            <p className="font-medium text-sm text-ink truncate">
                               {item.meal_name}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted">
                               {getMealTypeLabel(item.meal_type)}
                             </p>
                           </div>
@@ -520,15 +520,15 @@ export function Calendar({
                           <button onClick={e => {
                             e.stopPropagation();
                             toggleItemActions(`${item.recipe_id}-${item.serving_date}-${item.meal_type}`);
-                          }} className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200">
-                            <MoreHorizontalIcon size={18} className="text-gray-500" />
+                          }} className="p-2 rounded-full hover:bg-sage/50 active:bg-sage/60">
+                            <MoreHorizontalIcon size={18} className="text-muted" />
                           </button>
-                          {showItemActions === `${item.recipe_id}-${item.serving_date}-${item.meal_type}` && <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                          {showItemActions === `${item.recipe_id}-${item.serving_date}-${item.meal_type}` && <div className="absolute right-0 mt-1 w-36 bg-surface rounded-lg shadow-lg border border-line z-10">
                             <button onClick={e => {
                               e.stopPropagation();
                               handleDeleteRecipe(item);
                               setShowItemActions(null);
-                            }} className="w-full text-left px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 active:bg-red-100 flex items-center rounded-xl">
+                            }} className="w-full text-left px-3 py-2.5 text-sm text-herb hover:bg-sage/50 active:bg-sage flex items-center rounded-xl">
                               <TrashIcon size={14} className="mr-2" />
                               Remove
                             </button>
@@ -537,13 +537,13 @@ export function Calendar({
                       </div>
                     </div>)}
                   </div>}
-                  <div className="p-2 bg-gray-50 flex justify-center border-t border-gray-100">
+                  <div className="p-2 bg-linen flex justify-center border-t border-line">
                     <button onClick={e => {
                       e.stopPropagation();
                       const [year, month, day] = date.split('-').map(Number);
                       setSelectedDate(new Date(year, month - 1, day));
                       handleOpenAddRecipe(new Date(year, month - 1, day));
-                    }} className="text-sm text-red-600 hover:text-red-700 active:text-red-800 flex items-center px-3 py-1.5 rounded-lg hover:bg-red-50 active:bg-red-100 font-medium">
+                    }} className="text-sm text-herb hover:text-herb-deep active:text-herb-deep flex items-center px-3 py-1.5 rounded-lg hover:bg-sage/50 active:bg-sage font-medium">
                       <PlusIcon size={14} className="mr-1" />
                       Add meal
                     </button>
@@ -554,16 +554,16 @@ export function Calendar({
           </div>}
         </div>
         {/* Selected Date History - Only show in calendar view */}
-        {viewMode === 'calendar' && selectedDate && <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        {viewMode === 'calendar' && selectedDate && <div className="bg-surface rounded-2xl shadow-sm border border-line p-4">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-base font-semibold text-gray-800">
+            <h3 className="text-base font-semibold text-ink">
               {selectedDate.toLocaleDateString('en-US', {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric'
               })}
             </h3>
-            <button onClick={() => handleOpenAddRecipe(selectedDate)} className="flex items-center text-sm bg-red-500 text-white px-3 py-1.5 rounded-xl hover:bg-red-600 active:bg-red-700 transition-colors font-medium shadow-sm">
+            <button onClick={() => handleOpenAddRecipe(selectedDate)} className="flex items-center text-sm bg-herb text-white px-3 py-1.5 rounded-xl hover:bg-herb active:bg-herb-deep transition-colors font-medium shadow-sm">
               <PlusIcon size={16} className="mr-1" />
               Add
             </button>
@@ -572,20 +572,20 @@ export function Calendar({
             {Object.entries(getHistoryByMealType()).map(([type, meals]) => {
               if (meals.length === 0) return null;
               return <div key={type} className="mb-4 last:mb-0">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                <h4 className="text-sm font-medium text-ink mb-2">
                   {getMealTypeLabel(type)}:
                 </h4>
                 <div className="space-y-2">
                   {meals.map((item: MealPlan, index: number) => <div key={index} className={`p-4 rounded-xl border ${getMealTypeColor(type)} cursor-pointer hover:shadow-md transition-shadow`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center min-w-0 flex-1" onClick={() => handleMealClick(item)}>
-                        <div className={`w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0 ${type === 'breakfast' ? 'bg-blue-500' : type === 'lunch' ? 'bg-amber-500' : type === 'dinner' ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                        <p className="font-medium text-sm text-gray-800 truncate">
+                        <div className={`w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0 ${type === 'breakfast' ? 'bg-sage/500' : type === 'lunch' ? 'bg-sage/500' : type === 'dinner' ? 'bg-herb' : 'bg-sage/500'}`}></div>
+                        <p className="font-medium text-sm text-ink truncate">
                           {item.meal_name}
                         </p>
-                        {item.image && <ImageIcon size={18} className="ml-2 text-gray-400 flex-shrink-0" />}
+                        {item.image && <ImageIcon size={18} className="ml-2 text-muted flex-shrink-0" />}
                       </div>
-                      <button onClick={() => handleDeleteRecipe(item)} className="p-1.5 rounded-full hover:bg-red-100 active:bg-red-200 text-red-500 transition-colors ml-2 flex-shrink-0" aria-label="Delete recipe">
+                      <button onClick={() => handleDeleteRecipe(item)} className="p-1.5 rounded-full hover:bg-sage active:bg-sage text-herb transition-colors ml-2 flex-shrink-0" aria-label="Delete recipe">
                         <TrashIcon size={16} />
                       </button>
                     </div>
@@ -594,10 +594,10 @@ export function Calendar({
               </div>;
             })}
           </div> : <div className="text-center py-6">
-            <p className="text-gray-500">
+            <p className="text-muted">
               No meals recorded for this date.
             </p>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-muted text-sm mt-1">
               Cook something delicious today!
             </p>
           </div>}
@@ -608,16 +608,16 @@ export function Calendar({
         {/* Notification Toast */}
         {showNotification && (
           <div className="fixed top-4 right-4 z-50 max-w-sm">
-            <div className="flex items-start gap-3 bg-white border border-red-200 rounded-xl shadow-lg p-4">
+            <div className="flex items-start gap-3 bg-surface border border-line rounded-xl shadow-lg p-4">
 
               {/* Icon */}
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-sage/500 flex items-center justify-center">
                 <CheckIcon size={16} className="text-white" />
               </div>
 
               {/* Message */}
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-800">
+                <p className="text-sm font-medium text-ink">
                   {notificationMessage}
                 </p>
               </div>
@@ -628,26 +628,26 @@ export function Calendar({
                   setShowNotification(false);
                   setNotificationMessage('');
                 }}
-                className="text-gray-400 hover:text-gray-600 transition"
+                className="text-muted hover:text-muted transition"
               >
                 <XIcon size={16} />
               </button>
             </div>
           </div>
         )}
-        <div className="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10 rounded-t-2xl">
-            <h3 className="font-semibold text-gray-800 text-base">
+        <div className="bg-surface rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-4 border-b border-line flex justify-between items-center sticky top-0 bg-surface z-10 rounded-t-2xl">
+            <h3 className="font-semibold text-ink text-base">
               Add Recipe to Calendar
             </h3>
-            <button onClick={() => setShowAddRecipeModal(false)} className="p-1.5 rounded-full hover:bg-gray-100 active:bg-gray-200">
-              <XIcon size={20} className="text-gray-500" />
+            <button onClick={() => setShowAddRecipeModal(false)} className="p-1.5 rounded-full hover:bg-sage/50 active:bg-sage/60">
+              <XIcon size={20} className="text-muted" />
             </button>
           </div>
           <div className="p-6">
             <div className="space-y-4">
               <div>
-                <label htmlFor="meal-date" className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="meal-date" className="block text-sm font-medium text-ink mb-1.5">
                   Date
                 </label>
                 <input type="text" id="meal-date" value={selectedDate ? selectedDate.toLocaleDateString('en-US', {
@@ -658,52 +658,52 @@ export function Calendar({
                   month: 'long',
                   day: 'numeric',
                   year: 'numeric'
-                })} readOnly className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-600" />
+                })} readOnly className="w-full p-3 bg-linen border border-line rounded-xl text-muted" />
               </div>
               <div>
-                <label htmlFor="meal-type" className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="meal-type" className="block text-sm font-medium text-ink mb-1.5">
                   Meal Type
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(type => <button key={type} type="button" onClick={() => setSelectedMealType(type)} className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-all ${selectedMealType === type ? 'bg-red-500 border-red-500 text-white shadow-sm' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 active:bg-gray-100'}`}>
+                  {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(type => <button key={type} type="button" onClick={() => setSelectedMealType(type)} className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-all ${selectedMealType === type ? 'bg-herb border-herb text-white shadow-sm' : 'bg-surface border-line text-ink hover:bg-linen active:bg-sage/40'}`}>
                     {type.charAt(0).toUpperCase() + type.slice(1)}
                   </button>)}
                 </div>
               </div>
               <div>
-                <label htmlFor="recipe-search" className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="recipe-search" className="block text-sm font-medium text-ink mb-1.5">
                   Select Recipe
                 </label>
                 <div className="relative" ref={dropdownRef}>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <SearchIcon size={16} className="text-gray-400" />
+                      <SearchIcon size={16} className="text-muted" />
                     </div>
                     <input type="text" id="recipe-search" value={searchQuery} onChange={e => {
                       setSearchQuery(e.target.value);
                       setIsDropdownOpen(true);
                       setSelectedRecipeId('');
-                    }} onClick={() => setIsDropdownOpen(true)} placeholder="Search for a recipe..." className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                    }} onClick={() => setIsDropdownOpen(true)} placeholder="Search for a recipe..." className="w-full pl-10 pr-10 py-3 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent" />
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <ChevronDownIcon size={16} className="text-gray-400 cursor-pointer" onClick={() => setIsDropdownOpen(!isDropdownOpen)} />
+                      <ChevronDownIcon size={16} className="text-muted cursor-pointer" onClick={() => setIsDropdownOpen(!isDropdownOpen)} />
                     </div>
                   </div>
-                  {isDropdownOpen && <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-lg border border-gray-200 max-h-60 overflow-auto">
-                    {filteredRecipes.length > 0 ? filteredRecipes.map(recipe => <div key={recipe.id} className="px-4 py-2 hover:bg-red-50 cursor-pointer text-gray-800" onClick={() => handleSelectRecipe(recipe.id)}>
+                  {isDropdownOpen && <div className="absolute z-10 mt-1 w-full bg-surface shadow-lg rounded-lg border border-line max-h-60 overflow-auto">
+                    {filteredRecipes.length > 0 ? filteredRecipes.map(recipe => <div key={recipe.id} className="px-4 py-2 hover:bg-sage/50 cursor-pointer text-ink" onClick={() => handleSelectRecipe(recipe.id)}>
                       {recipe ? <div className="flex items-center">
                         <span>{recipe.meal_name}</span>
-                      </div> : <div className="text-gray-500">Unknown Recipe</div>}
-                    </div>) : <div className="px-4 py-3 text-gray-500 text-center">
+                      </div> : <div className="text-muted">Unknown Recipe</div>}
+                    </div>) : <div className="px-4 py-3 text-muted text-center">
                       No recipes found
                     </div>}
                   </div>}
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button onClick={() => setShowAddRecipeModal(false)} className="w-1/2 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-200 active:bg-gray-300 transition-colors">
+                <button onClick={() => setShowAddRecipeModal(false)} className="w-1/2 bg-sage/40 text-ink py-2.5 rounded-xl font-medium text-sm hover:bg-sage/60 active:bg-sage transition-colors">
                   Cancel
                 </button>
-                <button onClick={handleSaveRecipe} disabled={!selectedRecipeId} className={`w-1/2 py-2.5 rounded-xl font-medium text-sm transition-colors ${selectedRecipeId ? 'bg-red-500 text-white hover:bg-red-600 active:bg-red-700 shadow-sm' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                <button onClick={handleSaveRecipe} disabled={!selectedRecipeId} className={`w-1/2 py-2.5 rounded-xl font-medium text-sm transition-colors ${selectedRecipeId ? 'bg-herb text-white hover:bg-herb active:bg-herb-deep shadow-sm' : 'bg-sage/60 text-muted cursor-not-allowed'}`}>
                   Add
                 </button>
               </div>
@@ -713,20 +713,20 @@ export function Calendar({
       </div>}
       {/* Delete Confirmation Modal */}
       {showDeleteConfirmation && <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-xl shadow-lg max-w-sm w-full">
+        <div className="bg-surface rounded-xl shadow-lg max-w-sm w-full">
           <div className="p-5">
-            <div className="flex items-center text-red-600 mb-3">
+            <div className="flex items-center text-herb mb-3">
               <AlertCircleIcon size={24} className="mr-2" />
               <h3 className="text-base font-semibold">Confirm Deletion</h3>
             </div>
-            <p className="text-gray-600 mb-5 text-sm">
+            <p className="text-muted mb-5 text-sm">
               Are you sure you want to remove this recipe from your calendar?
             </p>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowDeleteConfirmation(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded-xl transition-colors font-medium text-sm">
+              <button onClick={() => setShowDeleteConfirmation(false)} className="px-4 py-2 bg-sage/40 hover:bg-sage/60 active:bg-sage text-ink rounded-xl transition-colors font-medium text-sm">
                 Cancel
               </button>
-              <button onClick={confirmDeleteRecipe} className="px-4 py-2 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-xl transition-colors font-medium text-sm shadow-sm">
+              <button onClick={confirmDeleteRecipe} className="px-4 py-2 bg-herb hover:bg-herb active:bg-herb-deep text-white rounded-xl transition-colors font-medium text-sm shadow-sm">
                 Delete
               </button>
             </div>
@@ -734,20 +734,20 @@ export function Calendar({
         </div>
       </div>}
       {showRecipeDetailModal && selectedRecipeForDetail && <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-        <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-slide-up">
+        <div className="bg-surface rounded-t-3xl sm:rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-slide-up">
           {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-gray-100 z-10">
+          <div className="sticky top-0 bg-surface border-b border-line z-10">
             <div className="p-5 flex justify-between items-start">
               <div className="flex-1 min-w-0 mr-4">
-                <h2 className="text-2xl font-bold text-gray-800 truncate">
+                <h2 className="text-2xl font-bold text-ink truncate">
                   {selectedRecipeForDetail.meal_name}
                 </h2>
               </div>
               <button onClick={() => {
                 setShowRecipeDetailModal(false);
                 setSelectedRecipeForDetail(null);
-              }} className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 flex-shrink-0" aria-label="Close">
-                <XIcon size={24} className="text-gray-500" />
+              }} className="p-2 rounded-full hover:bg-sage/50 active:bg-sage/60 flex-shrink-0" aria-label="Close">
+                <XIcon size={24} className="text-muted" />
               </button>
             </div>
           </div>
@@ -762,24 +762,24 @@ export function Calendar({
             <div className="p-6 space-y-6">
               {/* Ingredients Section */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <PackageIcon size={20} className="mr-2 text-red-500" />
+                <h3 className="text-lg font-semibold text-ink mb-4 flex items-center">
+                  <PackageIcon size={20} className="mr-2 text-herb" />
                   Ingredients
                 </h3>
-                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                  {selectedRecipeForDetail.ingredients && selectedRecipeForDetail.ingredients.map((item: any, index: number) => <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                <div className="bg-linen rounded-xl p-4 space-y-3">
+                  {selectedRecipeForDetail.ingredients && selectedRecipeForDetail.ingredients.map((item: any, index: number) => <div key={index} className="flex justify-between items-center py-2 border-b border-line last:border-b-0">
                     <div className="flex items-center flex-1">
-                      <div className="w-2 h-2 rounded-full bg-red-500 mr-3"></div>
+                      <div className="w-2 h-2 rounded-full bg-herb mr-3"></div>
                       <div>
-                        <span className="font-medium text-gray-800 capitalize">
+                        <span className="font-medium text-ink capitalize">
                           {item.name}
                         </span>
-                        <span className="text-sm text-gray-500 ml-2">
+                        <span className="text-sm text-muted ml-2">
                           {item.quantity && item.unit ? `(${item.quantity} ${item.unit})` : ''}
                         </span>
                       </div>
                     </div>
-                    {item.price && item.quantity && <span className="font-medium text-gray-700">
+                    {item.price && item.quantity && <span className="font-medium text-ink">
                       ${(item.price * item.quantity).toFixed(2)}
                     </span>}
                   </div>)}
@@ -787,8 +787,8 @@ export function Calendar({
               </div>
 
               {/* Additional Info */}
-              {selectedRecipeForDetail && <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                <p className="text-sm text-blue-800">
+              {selectedRecipeForDetail && <div className="bg-sage/50 rounded-xl p-4 border border-blue-100">
+                <p className="text-sm text-herb-deep">
                   <span className="font-medium">Intruction: </span>{' '}
                   1. Preheat your oven to 350°F (175°C).{' '}
                   2. Mix all ingredients in a bowl until well combined.{' '}
@@ -799,11 +799,11 @@ export function Calendar({
           </div>
 
           {/* Footer Actions */}
-          <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4">
+          <div className="sticky bottom-0 bg-surface border-t border-line p-4">
             <button onClick={() => {
               setShowRecipeDetailModal(false);
               setSelectedRecipeForDetail(null);
-            }} className="w-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-medium py-3 rounded-xl transition-colors">
+            }} className="w-full bg-sage/40 hover:bg-sage/60 active:bg-sage text-ink font-medium py-3 rounded-xl transition-colors">
               Close
             </button>
           </div>

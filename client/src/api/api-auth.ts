@@ -11,10 +11,15 @@ export interface SigninResponse {
   token: string;
 }
 
+export interface GoogleLoginResponse {
+  user: User;
+  token: string;
+}
+
 export const auth = {
   signup: (user: User, password: string) => api.post<SignupResponse>('/api/auth/signup', { ...user, password }),
   signin: (email: string, password: string) => api.post<SigninResponse>('/api/auth/signin', { email, password }),
   signout: () => api.get<ApiResponse>('/api/auth/signout'),
-  googleAuthLogin: (token: string) =>
-    api.post<ApiResponse<User>>('/api/auth/google-login', { token }),
+  /** Exchange a Google access token (from Google Identity Services) for an app JWT. */
+  googleLogin: (token: string) => api.post<GoogleLoginResponse>('/api/auth/google-login', { token }),
 };

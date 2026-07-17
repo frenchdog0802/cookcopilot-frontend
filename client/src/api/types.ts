@@ -80,6 +80,7 @@ export interface MealPlan {
 export interface RecipeSuggestion {
     id: string;
     name: string;
+    mealName?: string; // Compatible with Recipe.meal_name
     ingredients: {
         name: string;
         quantity: number;
@@ -90,4 +91,9 @@ export interface RecipeSuggestion {
     difficulty?: string;
     image?: string;
     savedAt?: number;
+    missingIngredient?: {
+        name: string;
+        quantity: number;
+        unit: string;
+    };
 }

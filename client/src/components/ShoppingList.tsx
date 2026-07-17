@@ -32,15 +32,15 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
     });
     const [dropdownVisible, setDropdownVisible] = useState(false);
     const [isAddingShoppingItem, setIsAddingShoppingItem] = useState(false);
-    const [selectedIndex, setSelectedIndex] = useState(-1);  // 新增：鍵盤導航索引
+    const [selectedIndex, setSelectedIndex] = useState(-1);  // ?��?：鍵?��??�索�?
 
-    // Shopping item search dropdown（直接用 name，鉤子內 debounce）
+    // Shopping item search dropdown（直?�用 name，鉤子內 debounce�?
     const { filteredIngredients: filteredShoppingIngredients, loading: shoppingLoading } = useSearchIngredients(
         newShoppingItem.name,
         ingredients
     );
 
-    // Auto-select if exactly one match and exact name match（用 useMemo 優化，避免循環）
+    // Auto-select if exactly one match and exact name match（用 useMemo ?��?，避?�循?��?
     const autoSelectLogic = useMemo(() => {
         if (filteredShoppingIngredients.length === 1) {
             const match = filteredShoppingIngredients[0];
@@ -83,7 +83,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
         setShoppingList(oriShoppingList);
     }, [oriShoppingList]);
 
-    // 新增輔助函數：選擇成分
+    // ?��?輔助?�數：選?��???
     const handleSelectIngredient = (ingredient: IngredientEntry) => {
         setNewShoppingItem({
             name: ingredient.name,
@@ -148,24 +148,21 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
     };
 
     return (
-        <div className="flex flex-col w-full min-h-screen bg-gray-50">
+        <div className="flex flex-col w-full min-h-screen bg-linen">
             <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
-                {/* Header */}
-                <header className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-5 shadow-md">
-                    <div className="container mx-auto flex justify-between items-center">
-                        <button onClick={onBack} className="p-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Go back">
-                            <ArrowLeftIcon size={24} />
-                        </button>
-                        <h1 className="text-xl font-bold">Shopping List</h1>
-                        <div className="w-10"></div> {/* For layout balance */}
-                    </div>
-                </header>
+                {/* Page title */}
+                <div className="max-w-3xl mx-auto px-6 lg:px-8 py-6 flex items-center gap-4">
+                    <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
+                        <ArrowLeftIcon size={22} />
+                    </button>
+                    <h1 className="page-title animate-fade-in">Shopping List</h1>
+                </div>
 
                 {/* Main Content */}
-                <main className="flex-1 container mx-auto p-5 max-w-3xl">
+                <main className="flex-1 max-w-3xl mx-auto w-full px-6 lg:px-8 py-6">
                     {/* Success Message Alert */}
                     {showMessage && (
-                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-800 text-sm font-medium animate-fade-in">
+                        <div className="mb-4 p-3 bg-sage/50 border border-line rounded-xl text-herb-deep text-sm font-medium animate-fade-in">
                             {message}
                         </div>
                     )}
@@ -173,14 +170,14 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                     {/* Search Bar */}
                     <div className="relative mb-6">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <SearchIcon size={18} className="text-gray-400" />
+                            <SearchIcon size={18} className="text-muted" />
                         </div>
                         <input
                             type="text"
                             placeholder="Search shopping items..."
                             value={shoppingSearchQuery}
                             onChange={e => setShoppingSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-line focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent"
                         />
                     </div>
 
@@ -188,14 +185,14 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                     {!isAddingShoppingItem ? (
                         <button
                             onClick={() => setIsAddingShoppingItem(true)}
-                            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium py-3 px-4 rounded-xl mb-6 shadow-sm transition-colors"
+                            className="w-full flex items-center justify-center gap-2 bg-surface border border-line hover:bg-linen text-ink font-medium py-3 px-4 rounded-xl mb-6 shadow-sm transition-colors"
                         >
                             <PlusIcon size={18} />
                             <span>Add New Shopping Item</span>
                         </button>
                     ) : (
-                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
-                            <h3 className="font-medium text-gray-700 mb-3">Add Item to Shopping List</h3>
+                        <div className="bg-surface p-4 rounded-xl shadow-sm border border-line mb-6">
+                            <h3 className="font-medium text-ink mb-3">Add Item to Shopping List</h3>
                             <div className="space-y-3 relative">
                                 <input
                                     type="text"
@@ -205,7 +202,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                         const newName = e.target.value;
                                         setNewShoppingItem({ ...newShoppingItem, name: newName });
                                         setDropdownVisible(newName.length > 0);
-                                        setSelectedIndex(-1);  // 重置選擇
+                                        setSelectedIndex(-1);  // ?�置?��?
                                     }}
                                     onKeyDown={(e) => {
                                         if (!dropdownVisible || filteredShoppingIngredients.length === 0) return;
@@ -238,37 +235,37 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                     onBlur={() => {
                                         setTimeout(() => setDropdownVisible(false), 200);
                                     }}
-                                    className="w-full p-2 border border-gray-200 rounded-lg"
+                                    className="w-full p-2 border border-line rounded-lg"
                                 />
 
                                 {dropdownVisible && (
-                                    <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
+                                    <ul className="absolute z-10 w-full bg-surface border border-line rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
                                         {shoppingLoading ? (
-                                            <li className="p-3 text-center text-gray-500 text-sm flex items-center justify-center">
+                                            <li className="p-3 text-center text-muted text-sm flex items-center justify-center">
                                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
                                                 Loading...
                                             </li>
                                         ) : filteredShoppingIngredients.length > 0 ? (
                                             filteredShoppingIngredients.map((ingredient: IngredientEntry, index: number) => {
                                                 const isSelected = index === selectedIndex;
-                                                // 高亮匹配文字（簡單實現）
+                                                // 高亮?��??��?（簡?�實?��?
                                                 const query = newShoppingItem.name.toLowerCase();
                                                 const highlightedName = ingredient.name.replace(
                                                     new RegExp(`(${query})`, 'gi'),
                                                     '<mark class="bg-yellow-200">$1</mark>'
                                                 );
                                                 return (
-                                                    <li key={ingredient.id} className={`p-3 ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
+                                                    <li key={ingredient.id} className={`p-3 ${isSelected ? 'bg-sage/50' : 'hover:bg-sage/50'}`}>
                                                         <button
                                                             onClick={() => handleSelectIngredient(ingredient)}
                                                             className={`w-full text-left ${isSelected ? 'font-medium' : ''}`}
-                                                            dangerouslySetInnerHTML={{ __html: highlightedName + ` <span class="text-sm text-gray-400">(${ingredient.default_unit})</span>` }}
+                                                            dangerouslySetInnerHTML={{ __html: highlightedName + ` <span class="text-sm text-muted">(${ingredient.default_unit})</span>` }}
                                                         />
                                                     </li>
                                                 );
                                             })
                                         ) : (
-                                            <li className="p-3 text-center text-gray-500 text-sm">
+                                            <li className="p-3 text-center text-muted text-sm">
                                                 No matching ingredients. Try typing more letters.
                                             </li>
                                         )}
@@ -293,7 +290,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                         placeholder="Unit (g, ml, etc.)"
                                         value={newShoppingItem.unit}
                                         onChange={(e) => setNewShoppingItem({ ...newShoppingItem, unit: e.target.value })}
-                                        className="w-2/3 p-2 border border-gray-200 rounded-lg"
+                                        className="w-2/3 p-2 border border-line rounded-lg"
                                     />
                                 </div>
 
@@ -304,7 +301,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                             setIsAddingShoppingItem(false);
                                             setDropdownVisible(false);
                                         }}
-                                        className="w-1/2 bg-gray-100 text-gray-700 py-2 rounded-lg"
+                                        className="w-1/2 bg-sage/40 text-ink py-2 rounded-lg"
                                     >
                                         Cancel
                                     </button>
@@ -316,43 +313,38 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                         </div>
                     )}
 
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="p-4 border-b border-gray-100 bg-gray-50">
-                            <h2 className="font-semibold text-gray-800">Items to Buy</h2>
+                    <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden">
+                        <div className="p-4 border-b border-line bg-linen">
+                            <h2 className="font-semibold text-ink">Items to Buy</h2>
                         </div>
                         {filteredShoppingItems.length === 0 ? (
                             <div className="p-6 text-center">
-                                <p className="text-gray-500">No items in your shopping list</p>
-                                {shoppingSearchQuery && <p className="text-gray-400 text-sm mt-1">Try a different search term</p>}
+                                <p className="text-muted">No items in your shopping list</p>
+                                {shoppingSearchQuery && <p className="text-muted text-sm mt-1">Try a different search term</p>}
                             </div>
                         ) : (
-                            <ul className="divide-y divide-gray-100">
+                            <ul className="divide-y divide-line">
                                 {filteredShoppingItems.map(item => (
-                                    <li key={item.id} className={`p-4 ${item.checked ? 'bg-gray-50' : ''}`}>
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex items-center">
-                                                <button
-                                                    onClick={() => handleTogglePurchased(item.id)}
-                                                    className={`w-5 h-5 mr-3 flex-shrink-0 rounded border ${item.checked ? 'bg-green-500 border-green-500 flex items-center justify-center' : 'border-gray-300'
-                                                        }`}
-                                                    aria-label={item.checked ? 'Mark as not purchased' : 'Mark as purchased'}
-                                                >
-                                                    {item.checked && <CheckIcon size={12} className="text-white" />}
-                                                </button>
-                                                <div className={item.checked ? 'line-through text-gray-400' : ''}>
-                                                    <h3 className="font-medium text-gray-800 capitalize">{item.name}</h3>
-                                                    <p className="text-gray-500 text-sm">{item.quantity} {item.unit}</p>
-                                                </div>
+                                    <li key={item.id} className={`px-4 py-3.5 ${item.checked ? 'bg-linen' : ''}`}>
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={() => handleTogglePurchased(item.id)}
+                                                className={`w-5 h-5 flex-shrink-0 rounded border flex items-center justify-center transition-colors ${item.checked ? 'bg-sage/500 border-green-500' : 'border-line hover:border-gray-400'}`}
+                                                aria-label={item.checked ? 'Mark as not purchased' : 'Mark as purchased'}
+                                            >
+                                                {item.checked && <CheckIcon size={12} className="text-white" />}
+                                            </button>
+                                            <div className={`flex-1 min-w-0 ${item.checked ? 'line-through opacity-50' : ''}`}>
+                                                <span className="font-semibold text-ink capitalize">{item.name}</span>
+                                                <span className="text-sm text-muted ml-2">{item.quantity} {item.unit}</span>
                                             </div>
-                                            <div className="flex items-center space-x-2">
-                                                <button
-                                                    onClick={() => handleRemoveShoppingItem(item.id)}
-                                                    className="p-1.5 rounded-full hover:bg-red-50 text-red-500"
-                                                    aria-label="Remove item"
-                                                >
-                                                    <TrashIcon size={18} />
-                                                </button>
-                                            </div>
+                                            <button
+                                                onClick={() => handleRemoveShoppingItem(item.id)}
+                                                className="p-1.5 flex-shrink-0 rounded-full hover:bg-sage/50 text-muted hover:text-herb transition-colors"
+                                                aria-label="Remove item"
+                                            >
+                                                <TrashIcon size={16} />
+                                            </button>
                                         </div>
                                     </li>
                                 ))}
