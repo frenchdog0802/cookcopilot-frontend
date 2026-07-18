@@ -4,8 +4,9 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 # Railway often injects NODE_ENV=production; vite/rollup live in devDependencies.
-# bookworm (glibc) avoids Alpine/musl optional @rollup/rollup-*-musl install failures.
-RUN npm ci --include=dev
+# npm optional-deps bug: Windows lockfiles may omit Linux Rollup natives — force install.
+RUN npm ci --include=dev \
+  && npm install --no-save @rollup/rollup-linux-x64-gnu@4.52.5
 
 COPY . .
 
