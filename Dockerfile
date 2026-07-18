@@ -20,9 +20,10 @@ ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 
 RUN npm run build
 
-# Runtime
+# Runtime — nginx image substitutes ${PORT} in /etc/nginx/templates/*.template
 FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+ENV PORT=80
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/app /usr/share/nginx/html
 
 EXPOSE 80
