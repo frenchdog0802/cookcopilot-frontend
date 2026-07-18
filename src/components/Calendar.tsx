@@ -206,7 +206,7 @@ export function Calendar({
       .map(s => `${s.name} (had ${s.available}${s.unit}, needed ${s.needed}${s.unit})`)
       .join('; ');
     const extra = shortages.length > 3 ? ` +${shortages.length - 3} more` : '';
-    setNotificationMessage(`Meal confirmed, but pantry was short: ${summary}${extra}. You can adjust stock in Pantry.`);
+    setNotificationMessage(t('calendar.shortage', { summary, extra }));
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 6000);
   };
@@ -504,14 +504,14 @@ export function Calendar({
                       onClick={() => handleConfirmMeal(item)}
                       className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-herb text-white hover:bg-herb-deep"
                     >
-                      {t('common.confirm')}
+                      {t('calendar.markCooked')}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleSkipMeal(item)}
                       className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line text-muted hover:bg-linen"
                     >
-                      {t('common.skip')}
+                      {t('calendar.didntCook')}
                     </button>
                   </div>
                 </div>
@@ -663,7 +663,7 @@ export function Calendar({
                                 setShowItemActions(null);
                               }} className="w-full text-left px-3 py-2.5 text-sm text-ink hover:bg-sage/50 active:bg-sage flex items-center rounded-t-xl">
                                 <CheckIcon size={14} className="mr-2" />
-                                Mark cooked
+                                {t('calendar.markCooked')}
                               </button>
                               <button onClick={e => {
                                 e.stopPropagation();
@@ -671,7 +671,7 @@ export function Calendar({
                                 setShowItemActions(null);
                               }} className="w-full text-left px-3 py-2.5 text-sm text-muted hover:bg-sage/50 active:bg-sage flex items-center">
                                 <XIcon size={14} className="mr-2" />
-                                Didn&apos;t cook
+                                {t('calendar.didntCook')}
                               </button>
                             </>}
                             <button onClick={e => {
@@ -736,9 +736,9 @@ export function Calendar({
                           </p>
                           {item.status && item.status !== 'PLANNED' && (
                             <p className="text-xs text-muted">
-                              {item.status === 'PENDING_CONFIRM' && 'Awaiting confirmation'}
-                              {item.status === 'CONFIRMED' && 'Cooked'}
-                              {item.status === 'SKIPPED' && 'Skipped'}
+                              {item.status === 'PENDING_CONFIRM' && t('calendar.statusPending')}
+                              {item.status === 'CONFIRMED' && t('calendar.statusCooked')}
+                              {item.status === 'SKIPPED' && t('calendar.statusDidntCook')}
                             </p>
                           )}
                         </div>
@@ -751,8 +751,8 @@ export function Calendar({
                               type="button"
                               onClick={e => handleConfirmMeal(item, e)}
                               className="p-1.5 rounded-full hover:bg-sage active:bg-sage text-herb transition-colors"
-                              aria-label="Mark cooked"
-                              title="Mark cooked"
+                              aria-label={t('calendar.markCooked')}
+                              title={t('calendar.markCooked')}
                             >
                               <CheckIcon size={16} />
                             </button>
@@ -760,8 +760,8 @@ export function Calendar({
                               type="button"
                               onClick={e => handleSkipMeal(item, e)}
                               className="p-1.5 rounded-full hover:bg-sage active:bg-sage text-muted transition-colors"
-                              aria-label="Didn't cook"
-                              title="Didn't cook"
+                              aria-label={t('calendar.didntCook')}
+                              title={t('calendar.didntCook')}
                             >
                               <XIcon size={16} />
                             </button>

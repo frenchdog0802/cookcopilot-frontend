@@ -1,4 +1,4 @@
-# Railway: deploy THIS folder only (Root Directory = frontend/client)
+# Railway: deploy THIS repo (Root Directory = /)
 # Separate from backend — nginx serves static SPA only (no API proxy).
 #
 # Build-time variables (must be set before/at build):
