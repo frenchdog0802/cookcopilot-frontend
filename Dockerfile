@@ -1,9 +1,11 @@
 # Build
-FROM node:20-alpine AS build
+FROM node:20-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# Railway often injects NODE_ENV=production; vite/rollup live in devDependencies.
+# bookworm (glibc) avoids Alpine/musl optional @rollup/rollup-*-musl install failures.
+RUN npm ci --include=dev
 
 COPY . .
 
