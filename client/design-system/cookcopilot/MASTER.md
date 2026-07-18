@@ -1,4 +1,4 @@
-# CookPlanner Design System — Warm Kitchen
+# CookCopilot Design System — Warm Kitchen
 
 > **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
 > If that file exists, its rules **override** this Master file.
@@ -6,10 +6,10 @@
 
 ---
 
-**Project:** CookPlanner  
+**Project:** CookCopilot  
 **Mood:** Warm kitchen — cozy, calm, food-at-home (not terracotta cliché, not dark dashboard)  
 **Surfaces aligned:** Web app + landing page  
-**Not yet aligned:** Mobile app (`Diet_APP_mobile`)
+**Not yet aligned:** Mobile app (`mobile`)
 
 ---
 
@@ -40,7 +40,7 @@
 | Display / brand / page titles | **Fraunces** | `font-display` |
 | Body / UI / nav | **Source Sans 3** | `font-sans` (default) |
 
-**Google Fonts import** (in `src/index.css` and `landingPage/style.css`):
+**Google Fonts import** (in `src/index.css` and `landing/style.css`):
 ```css
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
 ```
@@ -76,12 +76,12 @@ Defined in `src/index.css`:
 ## Layout Patterns
 
 ### App chrome
-- **Desktop:** Fixed sidebar (`Sidebar.tsx`) — CookPlanner wordmark, sage active nav.
+- **Desktop:** Fixed sidebar (`Sidebar.tsx`) — CookCopilot wordmark, sage active nav.
 - **Mobile:** Bottom tab bar (`BottomNav.tsx`) — herb active color on linen bar.
 - **No** full-width orange/red gradient headers on authenticated screens. Use quiet `.page-title` in content column.
 
 ### Home (first viewport)
-1. CookPlanner brand (Fraunces)
+1. CookCopilot brand (Fraunces)
 2. One line: "Plan dinner from what's already in your kitchen"
 3. Primary CTA: **Cook with what I have**
 4. Dominant kitchen/food image (edge-to-edge, not inset card)
@@ -93,7 +93,7 @@ Defined in `src/index.css`:
 - Use `.input-field` and `.btn-primary`
 
 ### Landing page
-- Same tokens as web app (`landingPage/style.css`)
+- Same tokens as web app (`landing/style.css`)
 - Hero: brand + headline + one sentence + CTA + full-bleed photo
 - Below fold: pain list → how it works → email CTA
 
@@ -102,7 +102,7 @@ Defined in `src/index.css`:
 ## Anti-patterns (do not use)
 
 - Orange→red gradients (`from-orange-500 to-red-600`)
-- ManageEat branding (use **CookPlanner**)
+- ManageEat branding (use **CookCopilot**)
 - Dark slate dashboard palette with green CTA overrides
 - Card grids for every section (stats tiles, action tiles, nested cards)
 - Emoji as icons (use Lucide)
@@ -116,7 +116,7 @@ Defined in `src/index.css`:
 |------|------|
 | `client/tailwind.config.js` | Tailwind color/font extensions |
 | `client/src/index.css` | CSS variables, base styles, component utilities |
-| `landingPage/style.css` | Same CSS variables for marketing |
+| `landing/style.css` | Same CSS variables for marketing |
 | `client/src/components/Sidebar.tsx` | Desktop nav chrome |
 | `client/src/components/BottomNav.tsx` | Mobile nav chrome |
 | `client/src/components/Home.tsx` | Reference for hero composition |

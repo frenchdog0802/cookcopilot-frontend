@@ -1,11 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon, SendIcon, SaveIcon, RefreshCwIcon, ShoppingCartIcon, ChevronRightIcon, FolderIcon, XIcon, MessageSquareIcon, PlusCircleIcon } from 'lucide-react';
 import { usePantry } from '../contexts/pantryContext';
 import { chatApi, ChatResponse, HistoryMessage } from '../api/chat';
 import { mealPlanApi } from '../api/mealPlan';
 import { RecipeSuggestion } from '../api/types';
+import ChatMessageContent from './ChatMessageContent';
 
 interface AICookingAssistantProps {
+  /** When false, the view is hidden but stays mounted so streams keep running. */
+  isActive?: boolean;
   onBack: () => void;
   onViewRecipe?: (recipeId: string) => void;
   onViewShoppingList?: () => void;
@@ -21,6 +25,7 @@ type MessageType =
   | 'shopping_list_updated'
   | 'meal_plan_updated'
   | 'pantry_updated'
+  | 'preferences_updated'
   | 'meal_suggestions'
   | 'multi_action'
   | 'action_result'
@@ -48,6 +53,11 @@ interface ResponseCardData {
   actionCount?: number;
   actions?: Array<Record<string, unknown>>;
   message?: string;
+  allergies?: string[];
+  dislikes?: string[];
+  likes?: string[];
+  dietaryRestrictions?: string[];
+  householdNotes?: string;
 }
 
 interface Message {
@@ -58,6 +68,7 @@ interface Message {
   timestamp: number;
   cardData?: ResponseCardData;
   streaming?: boolean;
+  statusText?: string;
 }
 
 const WELCOME_MESSAGE: Message = {
@@ -76,12 +87,14 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export function AICookingAssistant({
+  isActive = true,
   onBack,
   onViewRecipe,
   onViewShoppingList,
   onViewCalendar,
   onViewPantry,
 }: AICookingAssistantProps) {
+  const { t } = useTranslation();
   const {
     addRecipe,
     fetchAllRecipes,
@@ -137,21 +150,23 @@ export function AICookingAssistant({
     loadHistory();
   }, []);
 
-  // Scroll to bottom of messages
+  // Scroll to bottom of messages (only while the chat tab is visible)
   useEffect(() => {
+    if (!isActive) return;
     messagesEndRef.current?.scrollIntoView({
       behavior: 'smooth'
     });
-  }, [messages]);
-  // Focus input on mount
+  }, [messages, isActive]);
+  // Focus input when chat becomes visible
   useEffect(() => {
+    if (!isActive) return;
     inputRef.current?.focus();
-  }, []);
+  }, [isActive]);
   const mapResponseToMessage = (response: ChatResponse): Message => {
     const cardTypes: MessageType[] = [
       'recipe_created', 'recipe_imported', 'recipe_updated',
       'shopping_list_updated', 'meal_plan_updated', 'pantry_updated',
-      'meal_suggestions', 'multi_action', 'action_result',
+      'preferences_updated', 'meal_suggestions', 'multi_action', 'action_result',
     ];
     const cardData = response.data as ResponseCardData | undefined;
     return {
@@ -219,32 +234,47 @@ export function AICookingAssistant({
     onViewShoppingList?.();
   };
 
-  const renderRecipeCard = (message: Message, label = 'Recipe') => (
-    <div className="mt-3 bg-surface border border-line rounded-xl p-4">
-      <h3 className="font-medium text-ink">{label}: {message.cardData?.recipeName}</h3>
-      <p className="text-sm text-muted mt-1">
-        {message.cardData?.ingredientCount ?? 0} ingredients · {(message.cardData?.steps ?? []).length} steps
-      </p>
-      {message.cardData?.sourceUrl && (
-        <p className="text-xs text-muted mt-1 truncate">From: {message.cardData.sourceUrl}</p>
-      )}
-      <div className="flex gap-2 mt-3">
-        <button
-          onClick={() => message.cardData?.recipeId && handleViewCreatedRecipe(message.cardData.recipeId)}
-          className="flex-1 bg-sage/40 text-ink py-2 rounded-lg text-sm"
-        >
-          Edit Recipe
-        </button>
-        <button
-          onClick={() => message.cardData?.recipeId && handleAddCreatedRecipeToMenu(message.cardData.recipeId)}
-          disabled={addingToMenuRecipeId === message.cardData?.recipeId}
-          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm disabled:opacity-60"
-        >
-          Add to Menu
-        </button>
+  const renderRecipeCard = (message: Message, label = 'Recipe') => {
+    const steps = message.cardData?.steps ?? [];
+    return (
+      <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+        <h3 className="font-medium text-ink">{label}: {message.cardData?.recipeName}</h3>
+        <p className="text-sm text-muted mt-1">
+          {message.cardData?.ingredientCount ?? 0} ingredients · {steps.length} steps
+        </p>
+        {message.cardData?.sourceUrl && (
+          <p className="text-xs text-muted mt-1 truncate">From: {message.cardData.sourceUrl}</p>
+        )}
+        {steps.length > 0 && (
+          <ol className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+            {steps.map((step, index) => (
+              <li key={index} className="flex text-sm text-ink">
+                <span className="bg-sage rounded-full w-5 h-5 flex items-center justify-center text-herb-deep font-medium mr-2 flex-shrink-0 text-xs mt-0.5">
+                  {index + 1}
+                </span>
+                <span className="leading-snug">{step}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={() => message.cardData?.recipeId && handleViewCreatedRecipe(message.cardData.recipeId)}
+            className="flex-1 bg-sage/40 text-ink py-2 rounded-lg text-sm"
+          >
+            Edit Recipe
+          </button>
+          <button
+            onClick={() => message.cardData?.recipeId && handleAddCreatedRecipeToMenu(message.cardData.recipeId)}
+            disabled={addingToMenuRecipeId === message.cardData?.recipeId}
+            className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm disabled:opacity-60"
+          >
+            Add to Menu
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Generate a streaming response from the backend
   const generateResponse = async (userInput: string) => {
@@ -259,6 +289,14 @@ export function AICookingAssistant({
 
     setMessages(prev => [...prev, streamingMessage]);
     setIsTyping(true);
+    let settled = false;
+
+    const settleStreaming = (updater: (message: Message) => Message) => {
+      settled = true;
+      setMessages(prev => prev.map(message =>
+        message.id === assistantId ? updater(message) : message
+      ));
+    };
 
     try {
       await chatApi.streamSend(
@@ -267,55 +305,61 @@ export function AICookingAssistant({
           onToken: (token) => {
             setMessages(prev => prev.map(message =>
               message.id === assistantId
-                ? { ...message, content: message.content + token }
+                ? { ...message, content: message.content + token, statusText: undefined }
+                : message
+            ));
+          },
+          onStatus: (status) => {
+            setMessages(prev => prev.map(message =>
+              message.id === assistantId
+                ? { ...message, statusText: status.message }
                 : message
             ));
           },
           onDone: async (response) => {
             const finalized = mapResponseToMessage(response);
-            setMessages(prev => prev.map(message =>
-              message.id === assistantId
-                ? {
-                    ...finalized,
-                    id: assistantId,
-                    timestamp: message.timestamp,
-                    streaming: false,
-                  }
-                : message
-            ));
+            settleStreaming((message) => ({
+              ...finalized,
+              id: assistantId,
+              timestamp: message.timestamp,
+              streaming: false,
+              statusText: undefined,
+            }));
             if (finalized.type && finalized.type !== 'text' && finalized.type !== 'error') {
               await refreshAfterAgentAction(finalized.type);
             }
             setSuggestedRecipes([]);
           },
           onError: (message) => {
-            setMessages(prev => prev.map(entry =>
-              entry.id === assistantId
-                ? {
-                    ...entry,
-                    type: 'error',
-                    content: message || "I'm sorry, I'm having trouble connecting to my cooking brain right now. Please try again in a moment.",
-                    streaming: false,
-                  }
-                : entry
-            ));
+            settleStreaming((entry) => ({
+              ...entry,
+              type: 'error',
+              content: message || "I'm sorry, I'm having trouble connecting to my cooking brain right now. Please try again in a moment.",
+              streaming: false,
+              statusText: undefined,
+            }));
           },
         },
       );
     } catch (error) {
       console.error('Chat stream error:', error);
-      setMessages(prev => prev.map(message =>
-        message.id === assistantId
-          ? {
-              ...message,
-              type: 'error',
-              content: "I'm sorry, I'm having trouble connecting to my cooking brain right now. Please try again in a moment.",
-              streaming: false,
-            }
-          : message
-      ));
+      if (!settled) {
+        settleStreaming((message) => ({
+          ...message,
+          type: 'error',
+          content: "I'm sorry, I'm having trouble connecting to my cooking brain right now. Please try again in a moment.",
+          streaming: false,
+        }));
+      }
     } finally {
       setIsTyping(false);
+      if (!settled) {
+        setMessages(prev => prev.map(message =>
+          message.id === assistantId
+            ? { ...message, streaming: false }
+            : message
+        ));
+      }
     }
   };
   // Handle sending a message
@@ -350,11 +394,17 @@ export function AICookingAssistant({
     };
     setMessages(prevMessages => [...prevMessages, confirmationMessage]);
   };
-  // Handle clearing the chat
-  const handleClearChat = () => {
+  // Handle clearing the chat (UI + server history + AI memory)
+  const handleClearChat = async () => {
+    try {
+      await chatApi.clearHistory();
+    } catch (error) {
+      console.error('Failed to clear chat history', error);
+    }
     setMessages([WELCOME_MESSAGE]);
     setSuggestedRecipes([]);
     setSelectedRecipe(null);
+    setInputValue('');
   };
   // Handle removing a saved recipe
   const handleRemoveSavedRecipe = (recipeId: string) => {
@@ -404,24 +454,35 @@ export function AICookingAssistant({
           <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
             <ArrowLeftIcon size={22} />
           </button>
-          <h1 className="page-title animate-fade-in">AI Cooking Assistant</h1>
+          <h1 className="page-title animate-fade-in">{t('ai.title')}</h1>
         </div>
-        <button onClick={() => setShowSavedRecipes(!showSavedRecipes)} className={`p-2 rounded-lg ${showSavedRecipes ? 'bg-sage text-herb' : 'text-muted hover:text-ink hover:bg-sage/50'} transition-colors`} aria-label={showSavedRecipes ? 'Show chat' : 'Show saved recipes'}>
-          {showSavedRecipes ? <MessageSquareIcon size={22} /> : <FolderIcon size={22} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleClearChat}
+            disabled={isTyping}
+            className="px-3 py-1.5 text-sm rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors disabled:opacity-50"
+            title="New chat"
+            aria-label="Start a new chat"
+          >
+            New chat
+          </button>
+          <button onClick={() => setShowSavedRecipes(!showSavedRecipes)} className={`p-2 rounded-lg ${showSavedRecipes ? 'bg-sage text-herb' : 'text-muted hover:text-ink hover:bg-sage/50'} transition-colors`} aria-label={showSavedRecipes ? 'Show chat' : 'Show saved recipes'}>
+            {showSavedRecipes ? <MessageSquareIcon size={22} /> : <FolderIcon size={22} />}
+          </button>
+        </div>
       </div>
       {/* Main Content */}
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 lg:px-8 py-6 flex flex-col">
         {showSavedRecipes /* Saved Recipes View */ ? <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden flex-1">
           <div className="p-4 border-b border-line bg-linen flex justify-between items-center">
-            <h2 className="font-semibold text-ink">Saved Recipes</h2>
+            <h2 className="font-semibold text-ink">{t('ai.savedRecipes')}</h2>
             <button onClick={() => setShowSavedRecipes(false)} className="p-1 rounded-full hover:bg-sage/60" aria-label="Close">
               <XIcon size={18} className="text-muted" />
             </button>
           </div>
           {savedRecipes.length === 0 ? <div className="p-8 text-center text-muted">
             <FolderIcon size={48} className="mx-auto mb-4 text-muted/40" />
-            <p>No saved recipes yet</p>
+            <p>{t('ai.noSaved')}</p>
             <p className="text-sm mt-2">
               Ask the AI for recipe suggestions and save them here
             </p>
@@ -501,21 +562,32 @@ export function AICookingAssistant({
               <div className="space-y-6">
                 {messages.map(message => <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 ${message.role === 'user' ? 'bg-herb text-white' : message.type === 'error' ? 'bg-sage/50 text-herb-deep border border-line' : 'bg-sage/40 text-ink'}`}>
-                    <div className="whitespace-pre-line">
+                    <div>
                       {message.streaming && !message.content ? (
-                        <div className="flex space-x-1.5 py-1">
-                          <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:0ms]" />
-                          <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:150ms]" />
-                          <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:300ms]" />
+                        <div className="space-y-2">
+                          <div className="flex space-x-1.5 py-1">
+                            <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:0ms]" />
+                            <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:150ms]" />
+                            <span className="w-2 h-2 rounded-full bg-muted/70 animate-bounce [animation-delay:300ms]" />
+                          </div>
+                          {message.statusText && (
+                            <p className="text-xs text-muted">{message.statusText}</p>
+                          )}
                         </div>
                       ) : (
                         <>
-                          {message.content}
+                          <ChatMessageContent
+                            content={message.content}
+                            variant={message.role === 'user' ? 'user' : 'assistant'}
+                          />
                           {message.streaming && (
                             <span
                               aria-hidden="true"
                               className="inline-block w-0.5 h-[1.1em] ml-0.5 bg-herb align-text-bottom animate-pulse"
                             />
+                          )}
+                          {message.streaming && message.statusText && (
+                            <p className="mt-2 text-xs text-muted">{message.statusText}</p>
                           )}
                         </>
                       )}
@@ -595,6 +667,22 @@ export function AICookingAssistant({
                         </button>
                       </div>
                     )}
+                    {message.type === 'preferences_updated' && message.cardData && (
+                      <div className="mt-3 bg-surface border border-line rounded-xl p-4">
+                        <p className="font-medium text-ink mb-2">Preferences saved</p>
+                        <div className="text-sm text-muted space-y-1">
+                          {message.cardData.allergies?.length ? (
+                            <p>Allergies: {message.cardData.allergies.join(', ')}</p>
+                          ) : null}
+                          {message.cardData.dietaryRestrictions?.length ? (
+                            <p>Diet: {message.cardData.dietaryRestrictions.join(', ')}</p>
+                          ) : null}
+                          {message.cardData.householdNotes ? (
+                            <p>Household: {message.cardData.householdNotes}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
                     {message.type === 'meal_suggestions' && message.cardData && (
                       <div className="mt-3 bg-surface border border-line rounded-xl p-4">
                         <p className="font-medium text-ink mb-2">Meal suggestions</p>
@@ -665,7 +753,13 @@ export function AICookingAssistant({
             {/* Input Area */}
             <div className="border-t border-line p-4">
               <div className="flex items-center gap-2">
-                <button onClick={handleClearChat} className="p-2 text-muted hover:text-ink hover:bg-sage/50 rounded-full" title="Clear chat">
+                <button
+                  onClick={handleClearChat}
+                  disabled={isTyping}
+                  className="p-2 text-muted hover:text-ink hover:bg-sage/50 rounded-full disabled:opacity-50"
+                  title="New chat"
+                  aria-label="Start a new chat"
+                >
                   <RefreshCwIcon size={20} />
                 </button>
                 <div className="relative flex-1">
@@ -674,7 +768,7 @@ export function AICookingAssistant({
                       e.preventDefault();
                       handleSendMessage();
                     }
-                  }} placeholder="Ask CookPlanner to plan, import, or organize..." className="w-full py-3 px-4 pr-12 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent" disabled={isTyping} />
+                  }} placeholder="Ask CookCopilot to plan, import, or organize..." className="w-full py-3 px-4 pr-12 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent" disabled={isTyping} />
                   <button onClick={handleSendMessage} disabled={!inputValue.trim() || isTyping} aria-label="Send message" className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-herb hover:text-herb-deep disabled:text-muted">
                     <SendIcon size={20} />
                   </button>

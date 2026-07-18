@@ -18,6 +18,18 @@ function fromDto(dto: ShoppingListItemDto): ShoppingListItem {
     };
 }
 
+/** Backend Create/Update DTOs expect { name, details: { quantity, unit, checked } }. */
+function toRequestPayload(data: Partial<ShoppingListItem>) {
+    return {
+        name: data.name,
+        details: {
+            quantity: data.quantity,
+            unit: data.unit,
+            checked: data.checked ?? false,
+        },
+    };
+}
+
 export function parseShoppingListItems(data: unknown): ShoppingListItem[] {
     if (Array.isArray(data)) {
         return data.map(fromDto);
@@ -40,18 +52,16 @@ export function parseShoppingListItem(data: unknown): ShoppingListItem | null {
 }
 
 export const shoppingListApi = {
-    // List all shopping list items, optionally filtered by query
-    list: (query?: string) => api.get<ShoppingListItem[]>(query ? `/api/shopping-list?query=${encodeURIComponent(query)}` : '/api/shopping-list'),
+    list: (query?: string) =>
+        api.get<unknown>(query ? `/api/shopping-list?query=${encodeURIComponent(query)}` : '/api/shopping-list'),
 
-    // Get a single shopping list item by ID
-    get: (id: string | number) => api.get<ShoppingListItem>(`/api/shopping-list/${id}`),
+    get: (id: string | number) => api.get<unknown>(`/api/shopping-list/${id}`),
 
-    // Create a new shopping list item
-    create: (data: Partial<ShoppingListItem>) => api.post<ShoppingListItem>('/api/shopping-list', data),
+    create: (data: Partial<ShoppingListItem>) =>
+        api.post<unknown>('/api/shopping-list', toRequestPayload(data)),
 
-    // Update an existing shopping list item by ID
-    update: (id: string | number, data: Partial<ShoppingListItem>) => api.put<ShoppingListItem>(`/api/shopping-list/${id}`, data),
+    update: (id: string | number, data: Partial<ShoppingListItem>) =>
+        api.put<unknown>(`/api/shopping-list/${id}`, toRequestPayload(data)),
 
-    // Delete a shopping list item by ID
     delete: (id: string | number) => api.delete<void>(`/api/shopping-list/${id}`),
 };

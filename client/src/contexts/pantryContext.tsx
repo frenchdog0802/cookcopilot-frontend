@@ -1,11 +1,13 @@
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { PantryItem, ShoppingListItem, Recipe, Folder, UserSettings, IngredientEntry, MealPlan, ApiResponse } from '../api/types';
+import { PantryItem, ShoppingListItem, Recipe, Folder, UserSettings, IngredientEntry, MealPlan, ApiResponse, ConfirmMealPlanResult } from '../api/types';
 import { recipeApi } from '../api/recipes';
 import { folderApi } from '../api/folder';
-import { PantryItemApi } from '../api/pantryItem';
+import { PantryItemApi, parsePantryItem, parsePantryItems } from '../api/pantryItem';
 import { ingredientApi } from "../api/ingredient";
 import { parseShoppingListItem, parseShoppingListItems, shoppingListApi } from '../api/shoppingList';
 import { mealPlanApi } from '../api/mealPlan';
+import { userPreferencesApi } from '../api/userPreferences';
+import { resolveStoredLanguage } from '../i18n';
 
 function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key: string): T[] {
   if (Array.isArray(data)) {
@@ -15,8 +17,79 @@ function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key:
   return Array.isArray(list) ? list : [];
 }
 
+function normalizeInstructions(raw: unknown, stepsFallback?: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.map(String).map(s => s.trim()).filter(Boolean);
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
+  if (Array.isArray(stepsFallback)) {
+    return stepsFallback.map(String).map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeRecipeImage(raw: unknown): Recipe['image'] | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const image = raw as { url?: string; public_id?: string };
+  const url = typeof image.url === 'string' ? image.url.trim() : '';
+  if (!url) return null;
+  return {
+    url,
+    public_id: typeof image.public_id === 'string' ? image.public_id : '',
+  };
+}
+
+export function normalizeRecipe(raw: Record<string, unknown> | Recipe): Recipe {
+  const r = raw as Record<string, unknown>;
+
+  return {
+    ...(raw as Recipe),
+    id: String(r.id ?? ''),
+    meal_name: String(r.meal_name ?? r.mealName ?? ''),
+    folder_id: r.folder_id != null || r.folderId != null
+      ? String(r.folder_id ?? r.folderId)
+      : '',
+    instructions: normalizeInstructions(r.instructions, r.steps),
+    ingredients: Array.isArray(r.ingredients) ? (r.ingredients as Recipe['ingredients']) : [],
+    image: normalizeRecipeImage(r.image) as Recipe['image'],
+  };
+}
+
+/** Backend expects instructions as a single string. */
+function serializeRecipeForApi(recipe: Partial<Recipe>): Record<string, unknown> {
+  const instructions = recipe.instructions;
+  return {
+    ...recipe,
+    instructions: Array.isArray(instructions)
+      ? instructions.filter(Boolean).join('\n')
+      : instructions ?? '',
+    image: recipe.image?.url ? recipe.image : null,
+  };
+}
+
+function normalizeMealPlan(raw: Record<string, unknown> | MealPlan): MealPlan {
+  const record = raw as Record<string, unknown>;
+  const statusRaw = String(record.status ?? 'PLANNED').toUpperCase();
+  const status = (['PLANNED', 'PENDING_CONFIRM', 'CONFIRMED', 'SKIPPED'].includes(statusRaw)
+    ? statusRaw
+    : 'PLANNED') as MealPlan['status'];
+  return {
+    id: String(record.id ?? ''),
+    recipe_id: String(record.recipe_id ?? record.recipeId ?? ''),
+    meal_type: (record.meal_type ?? record.mealType ?? 'dinner') as MealPlan['meal_type'],
+    serving_date: String(record.serving_date ?? record.servingDate ?? ''),
+    meal_name: String(record.meal_name ?? record.mealName ?? ''),
+    image: (record.image as string | null | undefined)
+      ?? ((record.image_url as { url?: string } | undefined)?.url ?? null),
+    status,
+  };
+}
+
 interface PantryContextType {
   recipes: Recipe[];
+  recipesLoading: boolean;
   fetchAllRecipes: () => Promise<Recipe[]>;
   addRecipe: (Recipe: Recipe) => void;
   updateRecipe: (Recipe: Recipe) => void;
@@ -52,10 +125,14 @@ interface PantryContextType {
 
   // meal plans
   mealPlan: MealPlan[];
+  mealPlansLoading: boolean;
   fetchAllMealPlans: () => Promise<MealPlan[]>;
   addMealPlan: (mealPlan: MealPlan) => Promise<ApiResponse<MealPlan>>;
   updateMealPlan: (mealPlan: MealPlan) => void;
   deleteMealPlan: (id: string) => void;
+  confirmMealPlan: (id: string) => Promise<ApiResponse<ConfirmMealPlanResult>>;
+  skipMealPlan: (id: string) => Promise<ApiResponse<{ mealPlan: MealPlan; alreadySkipped: boolean }>>;
+  fetchPendingConfirmations: () => Promise<MealPlan[]>;
 }
 
 const PantryContext = createContext<PantryContextType | undefined>(undefined);
@@ -74,11 +151,31 @@ export function PantryProvider({
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipesLoading, setRecipesLoading] = useState(false);
+  const [mealPlansLoading, setMealPlansLoading] = useState(false);
   const [userSettings, setUserSettings] = useState<UserSettings>({
     name: '',
-    language: 'english',
+    language: resolveStoredLanguage(),
     measurement_unit: 'metric'
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const prefs = await userPreferencesApi.get();
+        if (!cancelled && prefs?.measurementUnit) {
+          setUserSettings(prev => ({
+            ...prev,
+            measurement_unit: prefs.measurementUnit,
+          }));
+        }
+      } catch (err) {
+        console.error('Load measurement preference failed:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const fetchAllFolders = async () => {
     try {
@@ -102,18 +199,20 @@ export function PantryProvider({
     try {
       const savedFolderResponse = await folderApi.create(folder);
       if (savedFolderResponse && savedFolderResponse.data && savedFolderResponse.success) {
-        // replace temp with the one from backend
-        console.log('Saved folder response:', savedFolderResponse);
-        const savedFolder = savedFolderResponse.data;
-        if (savedFolder) {
+        const payload = savedFolderResponse.data as Folder | { folder?: Folder };
+        const savedFolder = (payload && typeof payload === 'object' && 'folder' in payload && payload.folder)
+          ? payload.folder
+          : payload as Folder;
+        if (savedFolder?.id) {
           setFolders(prev =>
-            prev.map(f => (f.name === tempFolder.name ? savedFolder : f))
+            prev.map(f => (f.id === tempFolder.id || f.name === tempFolder.name ? savedFolder : f))
           );
+        } else {
+          await fetchAllFolders();
         }
       }
     } catch (err) {
       console.error('Insert folder failed:', err);
-      // rollback if needed
       setFolders(prev => prev.filter(f => f.id !== tempFolder.id));
     }
   };
@@ -129,16 +228,21 @@ export function PantryProvider({
 
 
   const fetchAllRecipes = async () => {
+    setRecipesLoading(true);
     try {
       const fetchedRecipesResponse = await recipeApi.list();
       if (fetchedRecipesResponse?.success && fetchedRecipesResponse.data) {
         const data = fetchedRecipesResponse.data as Recipe[] | { recipes?: Recipe[] };
-        const recipesList = unwrapListResponse(data, 'recipes');
+        const recipesList = unwrapListResponse(data, 'recipes').map(recipe =>
+          normalizeRecipe(recipe as unknown as Record<string, unknown>)
+        );
         setRecipes(recipesList);
         return recipesList;
       }
     } catch (err) {
       console.error('Fetch recipes failed:', err);
+    } finally {
+      setRecipesLoading(false);
     }
     return [];
   }
@@ -146,14 +250,20 @@ export function PantryProvider({
     // temporary recipe for optimistic UI
     const tempRecipe: Recipe = {
       ...recipe,
+      instructions: normalizeInstructions(recipe.instructions),
+      image: normalizeRecipeImage(recipe.image) as Recipe['image'],
     };
 
     setRecipes(prev => [...prev, tempRecipe]);
 
     try {
-      const savedRecipeResponse = await recipeApi.create(recipe);
+      const savedRecipeResponse = await recipeApi.create(serializeRecipeForApi(recipe) as Partial<Recipe>);
       if (savedRecipeResponse && savedRecipeResponse.data && savedRecipeResponse.success) {
-        const savedRecipe = savedRecipeResponse.data;
+        const raw = savedRecipeResponse.data as unknown;
+        const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
+          ? (raw as { recipe: Record<string, unknown> }).recipe
+          : raw) as Record<string, unknown>;
+        const savedRecipe = normalizeRecipe(payload);
 
         // replace temp with the one from backend
         setRecipes(prev =>
@@ -167,12 +277,17 @@ export function PantryProvider({
     }
   };
   const updateRecipe = (recipe: Recipe) => {
+    const normalized = {
+      ...recipe,
+      instructions: normalizeInstructions(recipe.instructions),
+      image: normalizeRecipeImage(recipe.image) as Recipe['image'],
+    };
     // optimistic update
-    setRecipes(prev => prev.map(r => r.id === recipe.id ? recipe : r));
+    setRecipes(prev => prev.map(r => r.id === recipe.id ? normalized : r));
 
     (async () => {
       try {
-        await recipeApi.update(recipe.id, recipe);
+        await recipeApi.update(recipe.id, serializeRecipeForApi(normalized) as Partial<Recipe>);
       } catch (err) {
         console.error('Update recipe failed:', err);
         // rollback by re-fetching recipes to restore consistent state
@@ -192,7 +307,7 @@ export function PantryProvider({
     try {
       const fetchedPantryItemsResponse = await PantryItemApi.list();
       if (fetchedPantryItemsResponse?.success && fetchedPantryItemsResponse.data) {
-        setPantryItems(unwrapListResponse(fetchedPantryItemsResponse.data, 'items'));
+        setPantryItems(parsePantryItems(fetchedPantryItemsResponse.data));
       }
     } catch (err) {
       console.error('Fetch pantry items failed:', err);
@@ -210,12 +325,18 @@ export function PantryProvider({
     try {
       const savedItemResponse = await PantryItemApi.create(item);
       if (savedItemResponse && savedItemResponse.data && savedItemResponse.success) {
-        const savedItem = savedItemResponse.data;
+        const savedItem = parsePantryItem(savedItemResponse.data);
 
-        // replace temp with the one from backend
-        setPantryItems(prev =>
-          prev.map(i => (i.id === tempItem.id ? savedItem : i))
-        );
+        if (savedItem) {
+          // replace temp with the one from backend
+          setPantryItems(prev =>
+            prev.map(i => (i.id === tempItem.id ? savedItem : i))
+          );
+        } else {
+          setPantryItems(prev => prev.filter(i => i.id !== tempItem.id));
+        }
+      } else {
+        setPantryItems(prev => prev.filter(i => i.id !== tempItem.id));
       }
     } catch (err) {
       console.error('Insert pantry item failed:', err);
@@ -280,7 +401,7 @@ export function PantryProvider({
       checked: false
     };
 
-    setShoppingList(prev => [...prev, tempItem]);
+    setShoppingList(prev => [tempItem, ...prev]);
 
     try {
       const savedItemResponse = await shoppingListApi.create(item);
@@ -313,16 +434,21 @@ export function PantryProvider({
 
   // meal plan functions
   const fetchAllMealPlans = async () => {
+    setMealPlansLoading(true);
     try {
       const fetchedMealPlansResponse = await mealPlanApi.list();
       if (fetchedMealPlansResponse?.success && fetchedMealPlansResponse.data) {
         const data = fetchedMealPlansResponse.data as MealPlan[] | { mealPlans?: MealPlan[] };
-        const mealPlansList = unwrapListResponse(data, 'mealPlans');
+        const mealPlansList = unwrapListResponse(data, 'mealPlans').map(plan =>
+          normalizeMealPlan(plan as unknown as Record<string, unknown>)
+        );
         setMealPlan(mealPlansList);
         return mealPlansList;
       }
     } catch (err) {
       console.error('Fetch meal plans failed:', err);
+    } finally {
+      setMealPlansLoading(false);
     }
     return [];
   };
@@ -336,12 +462,16 @@ export function PantryProvider({
     try {
       const savedMealPlanResponse = await mealPlanApi.create(mealPlan);
       if (savedMealPlanResponse && savedMealPlanResponse.data && savedMealPlanResponse.success) {
-        const savedMealPlan = savedMealPlanResponse.data;
+        const raw = savedMealPlanResponse.data as MealPlan | { mealPlan?: MealPlan };
+        const savedMealPlan = normalizeMealPlan(
+          (('mealPlan' in raw && raw.mealPlan) ? raw.mealPlan : raw) as unknown as Record<string, unknown>
+        );
 
         // replace temp with the one from backend
         setMealPlan(prev =>
           prev.map(m => (m.id === tempMealPlan.id ? savedMealPlan : m))
         );
+        return { ...savedMealPlanResponse, data: savedMealPlan };
       } else {
         // rollback if response is invalid
         setMealPlan(prev => prev.filter(m => m.id !== tempMealPlan.id));
@@ -363,8 +493,55 @@ export function PantryProvider({
     mealPlanApi.delete(id);
   };
 
+  const confirmMealPlan = async (id: string): Promise<ApiResponse<ConfirmMealPlanResult>> => {
+    try {
+      const response = await mealPlanApi.confirm(id);
+      if (response.success && response.data) {
+        const confirmed = normalizeMealPlan(
+          (response.data.mealPlan ?? response.data) as unknown as Record<string, unknown>
+        );
+        setMealPlan(prev => prev.map(m => (m.id === id ? confirmed : m)));
+        await fetchAllPantryItems();
+      }
+      return response as ApiResponse<ConfirmMealPlanResult>;
+    } catch (err) {
+      console.error('Confirm meal plan failed:', err);
+      return { success: false } as ApiResponse<ConfirmMealPlanResult>;
+    }
+  };
+
+  const skipMealPlan = async (id: string): Promise<ApiResponse<{ mealPlan: MealPlan; alreadySkipped: boolean }>> => {
+    try {
+      const response = await mealPlanApi.skip(id);
+      if (response.success && response.data) {
+        const skipped = normalizeMealPlan(
+          ((response.data as { mealPlan?: MealPlan }).mealPlan ?? response.data) as unknown as Record<string, unknown>
+        );
+        setMealPlan(prev => prev.map(m => (m.id === id ? skipped : m)));
+      }
+      return response as ApiResponse<{ mealPlan: MealPlan; alreadySkipped: boolean }>;
+    } catch (err) {
+      console.error('Skip meal plan failed:', err);
+      return { success: false } as ApiResponse<{ mealPlan: MealPlan; alreadySkipped: boolean }>;
+    }
+  };
+
+  const fetchPendingConfirmations = async (): Promise<MealPlan[]> => {
+    try {
+      const response = await mealPlanApi.pendingConfirm();
+      if (response.success && response.data) {
+        return unwrapListResponse(response.data as MealPlan[] | { mealPlans?: MealPlan[] }, 'mealPlans')
+          .map(plan => normalizeMealPlan(plan as unknown as Record<string, unknown>));
+      }
+    } catch (err) {
+      console.error('Fetch pending confirmations failed:', err);
+    }
+    return [];
+  };
+
   return <PantryContext.Provider value={{
     recipes,
+    recipesLoading,
     pantryItems,
     shoppingList,
     addRecipe,
@@ -390,10 +567,14 @@ export function PantryProvider({
     addShoppingListItem,
     removeShoppingListItem,
     mealPlan,
+    mealPlansLoading,
     fetchAllMealPlans,
     addMealPlan,
     updateMealPlan,
     deleteMealPlan,
+    confirmMealPlan,
+    skipMealPlan,
+    fetchPendingConfirmations,
     updateIngredients
   }}>
     {children}

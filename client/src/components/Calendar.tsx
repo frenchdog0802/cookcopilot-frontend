@@ -1,23 +1,34 @@
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon, PackageIcon, ImageIcon, PlusIcon, TrashIcon, XIcon, AlertCircleIcon, SearchIcon, ChevronDownIcon, CalendarIcon, ListIcon, MoreHorizontalIcon, ChevronUpIcon } from 'lucide-react';
-import { usePantry } from '../contexts/pantryContext';
+import { usePantry, normalizeRecipe } from '../contexts/pantryContext';
 import { MealPlan, Recipe } from '../api/types';
+import { recipeApi } from '../api/recipes';
+import { Loading } from './Loading';
+import { dateLocale } from '../i18n';
 interface CalendarProps {
   onBack: () => void;
 }
 export function Calendar({
   onBack
 }: CalendarProps) {
+  const { t, i18n } = useTranslation();
   const {
     addMealPlan,
     deleteMealPlan,
     fetchAllMealPlans,
-    fetchAllRecipes
+    fetchAllRecipes,
+    confirmMealPlan,
+    skipMealPlan,
+    mealPlan: contextMealPlans,
+    recipes: contextRecipes,
+    mealPlansLoading,
+    recipesLoading,
   } = usePantry();
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>(contextRecipes);
   const [showRecipeDetailModal, setShowRecipeDetailModal] = useState(false);
   const [selectedRecipeForDetail, setSelectedRecipeForDetail] = useState<Recipe | null>(null);
-  const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
+  const [mealPlans, setMealPlans] = useState<MealPlan[]>(contextMealPlans);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showAddRecipeModal, setShowAddRecipeModal] = useState(false);
@@ -52,17 +63,27 @@ export function Calendar({
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   // Get day of week of first day of month (0 = Sunday, 6 = Saturday)
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  const isInitialLoading = (mealPlansLoading || recipesLoading) && mealPlans.length === 0 && recipes.length === 0;
   useEffect(() => {
-    const fetchMealPlans = async () => {
-      const plans = await fetchAllMealPlans();
+    if (contextMealPlans.length > 0) {
+      setMealPlans(contextMealPlans);
+    }
+  }, [contextMealPlans]);
+  useEffect(() => {
+    if (contextRecipes.length > 0) {
+      setRecipes(contextRecipes);
+    }
+  }, [contextRecipes]);
+  useEffect(() => {
+    const loadCalendarData = async () => {
+      const [plans, fetchedRecipes] = await Promise.all([
+        fetchAllMealPlans(),
+        fetchAllRecipes(),
+      ]);
       setMealPlans(plans || []);
+      setRecipes(fetchedRecipes || []);
     };
-    const fetchReceipes = async () => {
-      const fetchedRecipes = await fetchAllRecipes();
-      setRecipes(fetchedRecipes);
-    };
-    fetchMealPlans();
-    fetchReceipes();
+    loadCalendarData();
   }, []);
   // Create array of days for the calendar
   const calendarDays = Array.from({
@@ -112,7 +133,7 @@ export function Calendar({
     setSelectedDate(new Date(currentYear, currentMonth, day));
   };
   // Month names for header
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthNames = Array.from({ length: 12 }, (_, i) => t(`months.${i}`));
   // Day names for header
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   // Get meal type color
@@ -131,23 +152,25 @@ export function Calendar({
     }
   };
   const getMealTypeLabel = (type: string) => {
-    return type.charAt(0).toUpperCase() + type.slice(1);
+    const key = `mealTypes.${type}` as const;
+    return t(key, { defaultValue: type.charAt(0).toUpperCase() + type.slice(1) });
   };
-  // Get meal type indicator color
+  // Distinct colors so calendar days show which meals are planned at a glance
   const getMealTypeIndicatorColor = (type: string) => {
     switch (type) {
       case 'breakfast':
-        return 'bg-sage/500';
+        return 'bg-amber-500';
       case 'lunch':
-        return 'bg-sage/500';
+        return 'bg-sky-500';
       case 'dinner':
         return 'bg-herb';
       case 'snack':
-        return 'bg-sage/500';
+        return 'bg-orange-400';
       default:
-        return 'bg-linen0';
+        return 'bg-muted';
     }
   };
+  const mealTypeOrder = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
   // Handle add recipe
   const handleOpenAddRecipe = (date?: Date) => {
@@ -175,6 +198,53 @@ export function Calendar({
       setMealPlans(prev => prev.filter(mp => mp.id !== recipeToDelete.id));
     }
   };
+
+  const showShortageTip = (shortages: Array<{ name: string; needed: number; available: number; unit: string }>) => {
+    if (!shortages.length) return;
+    const summary = shortages
+      .slice(0, 3)
+      .map(s => `${s.name} (had ${s.available}${s.unit}, needed ${s.needed}${s.unit})`)
+      .join('; ');
+    const extra = shortages.length > 3 ? ` +${shortages.length - 3} more` : '';
+    setNotificationMessage(`Meal confirmed, but pantry was short: ${summary}${extra}. You can adjust stock in Pantry.`);
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 6000);
+  };
+
+  const handleConfirmMeal = async (item: MealPlan, e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation();
+    const response = await confirmMealPlan(item.id);
+    if (response.success && response.data) {
+      const confirmed = response.data.mealPlan
+        ? { ...item, ...response.data.mealPlan, status: 'CONFIRMED' as const }
+        : { ...item, status: 'CONFIRMED' as const };
+      setMealPlans(prev => prev.map(mp => (mp.id === item.id ? confirmed : mp)));
+      const shortages = response.data.shortages || [];
+      if (shortages.length > 0) {
+        showShortageTip(shortages);
+      } else {
+        setNotificationMessage(t('calendar.confirmed', { name: item.meal_name }));
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 3500);
+      }
+    }
+  };
+
+  const handleSkipMeal = async (item: MealPlan, e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation();
+    const response = await skipMealPlan(item.id);
+    if (response.success) {
+      setMealPlans(prev => prev.map(mp => (mp.id === item.id ? { ...mp, status: 'SKIPPED' } : mp)));
+      setNotificationMessage(t('calendar.skipped', { name: item.meal_name }));
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    }
+  };
+
+  const pendingMeals = mealPlans.filter(m => m.status === 'PENDING_CONFIRM');
+  const canActOnMeal = (item: MealPlan) =>
+    !item.status || item.status === 'PLANNED' || item.status === 'PENDING_CONFIRM';
+
   // Filter recipes based on search query
   const filteredRecipes = recipes.filter(recipe => {
     // For meal recipes
@@ -228,19 +298,17 @@ export function Calendar({
       serving_date: dateString,
     };
     const response = await addMealPlan(calendarRecipe);
-    if (response && response.success) {
-      const newMealPlan = { ...calendarRecipe, id: response.data.id, image: response.data.image_url };
-      if (response.data.notEnoughItems && response.data.notEnoughItems.length > 0) {
-        // Show notification
-        setNotificationMessage('Recipe added! Required ingredients automatically added to your shopping list.');
-        setShowNotification(true);
-      } else {
-        setNotificationMessage('Recipe added to calendar!');
-        // No issues, add to state
-        setMealPlans(prev => [...prev, newMealPlan]);
-        // Reset and close modal
-        resetAddModal();
-      }
+    if (response && response.success && response.data) {
+      const saved = response.data;
+      // Context already updated; keep local list in sync immediately
+      setMealPlans(prev => {
+        const withoutTemp = prev.filter(m => m.id !== calendarRecipe.id);
+        const exists = withoutTemp.some(m => m.id === saved.id);
+        return exists ? withoutTemp : [...withoutTemp, saved];
+      });
+      setNotificationMessage(t('calendar.recipeAdded'));
+      setShowNotification(true);
+      resetAddModal();
     }
 
     // Auto close NotificationMessage after 3 seconds
@@ -313,26 +381,51 @@ export function Calendar({
     tomorrow.setDate(today.getDate() + 1);
     // Check if date is today, yesterday, or tomorrow
     if (date.toDateString() === today.toDateString()) {
-      return 'Today';
+      return t('common.today');
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
+      return t('common.yesterday');
     } else if (date.toDateString() === tomorrow.toDateString()) {
-      return 'Tomorrow';
+      return t('common.tomorrow');
     }
     // Otherwise return formatted date
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(dateLocale(i18n.language), {
       weekday: 'short',
       month: 'short',
       day: 'numeric'
     });
   };
 
-  const handleMealClick = (item: MealPlan) => {
-    const recipe = recipes.find(r => r.id === item.recipe_id);
-    if (recipe) {
-      setSelectedRecipeForDetail(recipe);
-      setShowRecipeDetailModal(true);
+  const handleMealClick = async (item: MealPlan) => {
+    const recipeId = String(item.recipe_id ?? '').trim();
+    let recipe = recipes.find(r => String(r.id) === recipeId) ?? null;
+
+    if (!recipe && recipeId) {
+      try {
+        const response = await recipeApi.get(recipeId);
+        if (response.success && response.data) {
+          const raw = response.data as unknown;
+          const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
+            ? (raw as { recipe: Record<string, unknown> }).recipe
+            : raw) as Record<string, unknown>;
+          recipe = normalizeRecipe(payload);
+          setRecipes(prev => (prev.some(r => r.id === recipe!.id) ? prev : [...prev, recipe!]));
+        }
+      } catch (err) {
+        console.error('Failed to load recipe for meal plan:', err);
+      }
     }
+
+    setSelectedRecipeForDetail(
+      recipe ?? {
+        id: recipeId,
+        meal_name: item.meal_name || 'Recipe',
+        folder_id: '',
+        instructions: [],
+        ingredients: [],
+        image: null,
+      }
+    );
+    setShowRecipeDetailModal(true);
   };
   // Format week range for display
   const getWeekRangeDisplay = () => {
@@ -380,32 +473,67 @@ export function Calendar({
       {/* Page title */}
       <div className="max-w-6xl mx-auto px-6 lg:px-8 py-6 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
+          <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label={t('common.back')}>
             <ArrowLeftIcon size={20} />
           </button>
-          <h1 className="page-title animate-fade-in">Cooking Calendar</h1>
+          <h1 className="page-title animate-fade-in">{t('calendar.title')}</h1>
         </div>
-        <button onClick={() => handleOpenAddRecipe(new Date())} className="p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Add Recipe">
+        <button onClick={() => handleOpenAddRecipe(new Date())} className="p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label={t('calendar.addRecipe')}>
           <PlusIcon size={20} />
         </button>
       </div>
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto max-w-6xl mx-auto w-full px-6 lg:px-8 pb-4">
+        {pendingMeals.length > 0 && (
+          <div className="mb-3 rounded-xl border border-herb/30 bg-sage/40 p-3 space-y-2">
+            <p className="text-sm font-medium text-ink">
+              {pendingMeals.length === 1
+                ? t('calendar.didYouCook', { name: pendingMeals[0].meal_name })
+                : t('calendar.pendingConfirm')}
+            </p>
+            <div className="space-y-2">
+              {pendingMeals.map(item => (
+                <div key={item.id} className="flex items-center justify-between gap-2 bg-surface/80 rounded-lg px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-ink truncate">{item.meal_name}</p>
+                    <p className="text-xs text-muted">{item.serving_date} · {getMealTypeLabel(item.meal_type)}</p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmMeal(item)}
+                      className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-herb text-white hover:bg-herb-deep"
+                    >
+                      {t('common.confirm')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSkipMeal(item)}
+                      className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line text-muted hover:bg-linen"
+                    >
+                      {t('common.skip')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* View Toggle */}
         <div className="bg-surface rounded-xl shadow-sm border border-line p-2 mb-2 mt-2">
           <div className="flex justify-between items-center mb-3">
             <div className="flex space-x-2">
               <button onClick={() => setViewMode('calendar')} className={`px-4 py-2 rounded-xl flex items-center text-sm font-medium transition-all ${viewMode === 'calendar' ? 'bg-herb text-white shadow-sm' : 'bg-linen text-muted'}`}>
                 <CalendarIcon size={18} className="mr-1.5" />
-                Month
+                {t('calendar.calendarView')}
               </button>
               <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-xl flex items-center text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-herb text-white shadow-sm' : 'bg-linen text-muted'}`}>
                 <ListIcon size={18} className="mr-1.5" />
-                Week
+                {t('calendar.listView')}
               </button>
             </div>
           </div>
-          {viewMode === 'calendar' && <>
+          {isInitialLoading ? <Loading /> : viewMode === 'calendar' && <>
             <div className="flex justify-between items-center">
               <button onClick={previousMonth} className="p-2 rounded-xl hover:bg-linen text-ink active:bg-sage/40 transition-colors" aria-label="Previous month">
                 <ChevronLeftIcon size={20} />
@@ -451,36 +579,40 @@ export function Calendar({
                       <span className={`text-center text-sm lg:text-base ${isToday ? 'font-bold text-herb' : 'text-ink'} leading-none`}>
                         {day}
                       </span>
-                      <div className="flex flex-col gap-0.5">
-                        {hasMealTypes.breakfast && <div className="h-0.5 bg-sage/500 rounded-full"></div>}
-                        {hasMealTypes.lunch && <div className="h-0.5 bg-sage/500 rounded-full"></div>}
-                        {hasMealTypes.dinner && <div className="h-0.5 bg-herb rounded-full"></div>}
-                        {hasMealTypes.snack && <div className="h-0.5 bg-sage/500 rounded-full"></div>}
+                      <div className="flex flex-col gap-0.5 mt-0.5">
+                        {mealTypeOrder.map(type => hasMealTypes[type] ? <div key={type} className={`h-1 rounded-full ${getMealTypeIndicatorColor(type)}`} title={getMealTypeLabel(type)} /> : null)}
                       </div>
                     </>}
                   </div>;
                 })}
               </div>
+              {/* Meal type color legend */}
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs text-muted">
+                {mealTypeOrder.map(type => <div key={type} className="flex items-center gap-1.5">
+                  <span className={`w-3 h-1 rounded-full ${getMealTypeIndicatorColor(type)}`} />
+                  <span>{getMealTypeLabel(type)}</span>
+                </div>)}
+              </div>
             </div>
           </>}
           {/* List View */}
-          {viewMode === 'list' && <div className="mt-2">
+          {!isInitialLoading && viewMode === 'list' && <div className="mt-2">
             {/* Week Navigation Controls */}
             <div className="flex justify-between items-center mb-3">
               <button onClick={goToPreviousWeek} className="flex items-center text-ink hover:text-ink px-2 py-1.5 rounded-lg hover:bg-linen active:bg-sage/40 text-sm">
                 <ChevronLeftIcon size={16} className="mr-0.5" />
-                Prev
+                {t('calendar.prev')}
               </button>
               <div className="flex items-center">
                 <button onClick={goToCurrentWeek} className="px-3 py-1.5 text-xs rounded-lg bg-sage/50 text-herb border border-blue-100 hover:bg-sage active:bg-blue-200 font-medium">
-                  Today
+                  {t('common.today')}
                 </button>
                 <span className="mx-2 text-sm font-medium text-ink">
                   {getWeekRangeDisplay()}
                 </span>
               </div>
               <button onClick={goToNextWeek} className="flex items-center text-ink hover:text-ink px-2 py-1.5 rounded-lg hover:bg-linen active:bg-sage/40 text-sm">
-                Next
+                {t('calendar.next')}
                 <ChevronRightIcon size={16} className="ml-0.5" />
               </button>
             </div>
@@ -523,12 +655,30 @@ export function Calendar({
                           }} className="p-2 rounded-full hover:bg-sage/50 active:bg-sage/60">
                             <MoreHorizontalIcon size={18} className="text-muted" />
                           </button>
-                          {showItemActions === `${item.recipe_id}-${item.serving_date}-${item.meal_type}` && <div className="absolute right-0 mt-1 w-36 bg-surface rounded-lg shadow-lg border border-line z-10">
+                          {showItemActions === `${item.recipe_id}-${item.serving_date}-${item.meal_type}` && <div className="absolute right-0 mt-1 w-40 bg-surface rounded-lg shadow-lg border border-line z-10">
+                            {canActOnMeal(item) && <>
+                              <button onClick={e => {
+                                e.stopPropagation();
+                                handleConfirmMeal(item, e);
+                                setShowItemActions(null);
+                              }} className="w-full text-left px-3 py-2.5 text-sm text-ink hover:bg-sage/50 active:bg-sage flex items-center rounded-t-xl">
+                                <CheckIcon size={14} className="mr-2" />
+                                Mark cooked
+                              </button>
+                              <button onClick={e => {
+                                e.stopPropagation();
+                                handleSkipMeal(item, e);
+                                setShowItemActions(null);
+                              }} className="w-full text-left px-3 py-2.5 text-sm text-muted hover:bg-sage/50 active:bg-sage flex items-center">
+                                <XIcon size={14} className="mr-2" />
+                                Didn&apos;t cook
+                              </button>
+                            </>}
                             <button onClick={e => {
                               e.stopPropagation();
                               handleDeleteRecipe(item);
                               setShowItemActions(null);
-                            }} className="w-full text-left px-3 py-2.5 text-sm text-herb hover:bg-sage/50 active:bg-sage flex items-center rounded-xl">
+                            }} className="w-full text-left px-3 py-2.5 text-sm text-herb hover:bg-sage/50 active:bg-sage flex items-center rounded-b-xl">
                               <TrashIcon size={14} className="mr-2" />
                               Remove
                             </button>
@@ -545,7 +695,7 @@ export function Calendar({
                       handleOpenAddRecipe(new Date(year, month - 1, day));
                     }} className="text-sm text-herb hover:text-herb-deep active:text-herb-deep flex items-center px-3 py-1.5 rounded-lg hover:bg-sage/50 active:bg-sage font-medium">
                       <PlusIcon size={14} className="mr-1" />
-                      Add meal
+                      {t('calendar.addMeal')}
                     </button>
                   </div>
                 </div>;
@@ -557,7 +707,7 @@ export function Calendar({
         {viewMode === 'calendar' && selectedDate && <div className="bg-surface rounded-2xl shadow-sm border border-line p-4">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-base font-semibold text-ink">
-              {selectedDate.toLocaleDateString('en-US', {
+              {selectedDate.toLocaleDateString(dateLocale(i18n.language), {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric'
@@ -565,7 +715,7 @@ export function Calendar({
             </h3>
             <button onClick={() => handleOpenAddRecipe(selectedDate)} className="flex items-center text-sm bg-herb text-white px-3 py-1.5 rounded-xl hover:bg-herb active:bg-herb-deep transition-colors font-medium shadow-sm">
               <PlusIcon size={16} className="mr-1" />
-              Add
+              {t('common.add')}
             </button>
           </div>
           {getHistoryForSelectedDate().length > 0 ? <div>
@@ -577,17 +727,50 @@ export function Calendar({
                 </h4>
                 <div className="space-y-2">
                   {meals.map((item: MealPlan, index: number) => <div key={index} className={`p-4 rounded-xl border ${getMealTypeColor(type)} cursor-pointer hover:shadow-md transition-shadow`}>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center min-w-0 flex-1" onClick={() => handleMealClick(item)}>
-                        <div className={`w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0 ${type === 'breakfast' ? 'bg-sage/500' : type === 'lunch' ? 'bg-sage/500' : type === 'dinner' ? 'bg-herb' : 'bg-sage/500'}`}></div>
-                        <p className="font-medium text-sm text-ink truncate">
-                          {item.meal_name}
-                        </p>
+                        <div className={`w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0 ${getMealTypeIndicatorColor(type)}`}></div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm text-ink truncate">
+                            {item.meal_name}
+                          </p>
+                          {item.status && item.status !== 'PLANNED' && (
+                            <p className="text-xs text-muted">
+                              {item.status === 'PENDING_CONFIRM' && 'Awaiting confirmation'}
+                              {item.status === 'CONFIRMED' && 'Cooked'}
+                              {item.status === 'SKIPPED' && 'Skipped'}
+                            </p>
+                          )}
+                        </div>
                         {item.image && <ImageIcon size={18} className="ml-2 text-muted flex-shrink-0" />}
                       </div>
-                      <button onClick={() => handleDeleteRecipe(item)} className="p-1.5 rounded-full hover:bg-sage active:bg-sage text-herb transition-colors ml-2 flex-shrink-0" aria-label="Delete recipe">
-                        <TrashIcon size={16} />
-                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {canActOnMeal(item) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={e => handleConfirmMeal(item, e)}
+                              className="p-1.5 rounded-full hover:bg-sage active:bg-sage text-herb transition-colors"
+                              aria-label="Mark cooked"
+                              title="Mark cooked"
+                            >
+                              <CheckIcon size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={e => handleSkipMeal(item, e)}
+                              className="p-1.5 rounded-full hover:bg-sage active:bg-sage text-muted transition-colors"
+                              aria-label="Didn't cook"
+                              title="Didn't cook"
+                            >
+                              <XIcon size={16} />
+                            </button>
+                          </>
+                        )}
+                        <button onClick={() => handleDeleteRecipe(item)} className="p-1.5 rounded-full hover:bg-sage active:bg-sage text-herb transition-colors" aria-label="Delete recipe">
+                          <TrashIcon size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>)}
                 </div>
@@ -595,7 +778,7 @@ export function Calendar({
             })}
           </div> : <div className="text-center py-6">
             <p className="text-muted">
-              No meals recorded for this date.
+              {t('calendar.noMealsForDate')}
             </p>
             <p className="text-muted text-sm mt-1">
               Cook something delicious today!
@@ -638,7 +821,7 @@ export function Calendar({
         <div className="bg-surface rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div className="p-4 border-b border-line flex justify-between items-center sticky top-0 bg-surface z-10 rounded-t-2xl">
             <h3 className="font-semibold text-ink text-base">
-              Add Recipe to Calendar
+              {t('calendar.addToCalendar')}
             </h3>
             <button onClick={() => setShowAddRecipeModal(false)} className="p-1.5 rounded-full hover:bg-sage/50 active:bg-sage/60">
               <XIcon size={20} className="text-muted" />
@@ -648,13 +831,13 @@ export function Calendar({
             <div className="space-y-4">
               <div>
                 <label htmlFor="meal-date" className="block text-sm font-medium text-ink mb-1.5">
-                  Date
+                  {t('calendar.date')}
                 </label>
-                <input type="text" id="meal-date" value={selectedDate ? selectedDate.toLocaleDateString('en-US', {
+                <input type="text" id="meal-date" value={selectedDate ? selectedDate.toLocaleDateString(dateLocale(i18n.language), {
                   month: 'long',
                   day: 'numeric',
                   year: 'numeric'
-                }) : new Date().toLocaleDateString('en-US', {
+                }) : new Date().toLocaleDateString(dateLocale(i18n.language), {
                   month: 'long',
                   day: 'numeric',
                   year: 'numeric'
@@ -662,17 +845,17 @@ export function Calendar({
               </div>
               <div>
                 <label htmlFor="meal-type" className="block text-sm font-medium text-ink mb-1.5">
-                  Meal Type
+                  {t('calendar.mealType')}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(type => <button key={type} type="button" onClick={() => setSelectedMealType(type)} className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-all ${selectedMealType === type ? 'bg-herb border-herb text-white shadow-sm' : 'bg-surface border-line text-ink hover:bg-linen active:bg-sage/40'}`}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                    {getMealTypeLabel(type)}
                   </button>)}
                 </div>
               </div>
               <div>
                 <label htmlFor="recipe-search" className="block text-sm font-medium text-ink mb-1.5">
-                  Select Recipe
+                  {t('calendar.selectRecipe')}
                 </label>
                 <div className="relative" ref={dropdownRef}>
                   <div className="relative">
@@ -717,17 +900,17 @@ export function Calendar({
           <div className="p-5">
             <div className="flex items-center text-herb mb-3">
               <AlertCircleIcon size={24} className="mr-2" />
-              <h3 className="text-base font-semibold">Confirm Deletion</h3>
+              <h3 className="text-base font-semibold">{t('calendar.confirmDeletion')}</h3>
             </div>
             <p className="text-muted mb-5 text-sm">
-              Are you sure you want to remove this recipe from your calendar?
+              {t('calendar.deleteMealConfirm')}
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowDeleteConfirmation(false)} className="px-4 py-2 bg-sage/40 hover:bg-sage/60 active:bg-sage text-ink rounded-xl transition-colors font-medium text-sm">
-                Cancel
+                {t('common.cancel')}
               </button>
               <button onClick={confirmDeleteRecipe} className="px-4 py-2 bg-herb hover:bg-herb active:bg-herb-deep text-white rounded-xl transition-colors font-medium text-sm shadow-sm">
-                Delete
+                {t('common.delete')}
               </button>
             </div>
           </div>
@@ -755,9 +938,11 @@ export function Calendar({
           {/* Content */}
           <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
             {/* Recipe Image */}
-            {selectedRecipeForDetail.image && <div className="w-full h-64 relative">
-              <img src={selectedRecipeForDetail.image.url} alt={selectedRecipeForDetail.meal_name || 'Recipe'} className="w-full h-full object-cover" />
-            </div>}
+            {selectedRecipeForDetail.image?.url ? (
+              <div className="w-full h-64 relative">
+                <img src={selectedRecipeForDetail.image.url} alt={selectedRecipeForDetail.meal_name || 'Recipe'} className="w-full h-full object-cover" />
+              </div>
+            ) : null}
 
             <div className="p-6 space-y-6">
               {/* Ingredients Section */}
@@ -767,34 +952,46 @@ export function Calendar({
                   Ingredients
                 </h3>
                 <div className="bg-linen rounded-xl p-4 space-y-3">
-                  {selectedRecipeForDetail.ingredients && selectedRecipeForDetail.ingredients.map((item: any, index: number) => <div key={index} className="flex justify-between items-center py-2 border-b border-line last:border-b-0">
-                    <div className="flex items-center flex-1">
-                      <div className="w-2 h-2 rounded-full bg-herb mr-3"></div>
-                      <div>
-                        <span className="font-medium text-ink capitalize">
-                          {item.name}
-                        </span>
-                        <span className="text-sm text-muted ml-2">
-                          {item.quantity && item.unit ? `(${item.quantity} ${item.unit})` : ''}
-                        </span>
+                  {(selectedRecipeForDetail.ingredients?.length ?? 0) > 0 ? (
+                    selectedRecipeForDetail.ingredients.map((item: any, index: number) => (
+                      <div key={index} className="flex justify-between items-center py-2 border-b border-line last:border-b-0">
+                        <div className="flex items-center flex-1">
+                          <div className="w-2 h-2 rounded-full bg-herb mr-3"></div>
+                          <div>
+                            <span className="font-medium text-ink capitalize">
+                              {item.name}
+                            </span>
+                            <span className="text-sm text-muted ml-2">
+                              {item.quantity && item.unit ? `(${item.quantity} ${item.unit})` : ''}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    {item.price && item.quantity && <span className="font-medium text-ink">
-                      ${(item.price * item.quantity).toFixed(2)}
-                    </span>}
-                  </div>)}
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted">No ingredients listed for this recipe.</p>
+                  )}
                 </div>
               </div>
 
-              {/* Additional Info */}
-              {selectedRecipeForDetail && <div className="bg-sage/50 rounded-xl p-4 border border-blue-100">
-                <p className="text-sm text-herb-deep">
-                  <span className="font-medium">Intruction: </span>{' '}
-                  1. Preheat your oven to 350°F (175°C).{' '}
-                  2. Mix all ingredients in a bowl until well combined.{' '}
-                  {/* {getMealTypeLabel(selectedRecipeForDetail.mealInfo.type)} */}
-                </p>
-              </div>}
+              {/* Instructions */}
+              <div>
+                <h3 className="text-lg font-semibold text-ink mb-4">Instructions</h3>
+                {(selectedRecipeForDetail.instructions?.length ?? 0) > 0 ? (
+                  <ol className="space-y-3">
+                    {selectedRecipeForDetail.instructions.map((step, index) => (
+                      <li key={index} className="flex">
+                        <div className="bg-sage rounded-full w-6 h-6 flex items-center justify-center text-herb-deep font-medium mr-3 flex-shrink-0 mt-0.5 text-sm">
+                          {index + 1}
+                        </div>
+                        <p className="text-ink">{step}</p>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-sm text-muted">No instructions available for this recipe.</p>
+                )}
+              </div>
             </div>
           </div>
 

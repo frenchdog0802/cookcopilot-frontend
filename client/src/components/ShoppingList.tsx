@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon, PlusIcon, CheckIcon, SearchIcon, TrashIcon } from 'lucide-react';
 import { usePantry } from '../contexts/pantryContext';
 import { IngredientEntry, PantryItem, ShoppingListItem } from '../api/types';
 import useSearchIngredients from '../hooks/useSearchIngredient';
 import { NumberInput } from './NumberInput';
+import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from './UnitSelect';
+import type { MeasurementSystem } from '../utils/units';
 
 interface ShoppingListProps {
     onBack: () => void;
 }
 
 export function ShoppingList({ onBack }: ShoppingListProps) {
+    const { t } = useTranslation();
     const {
         shoppingList: oriShoppingList,
         ingredients,
@@ -17,9 +21,12 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
         addShoppingListItem,
         updateShoppingListItem,
         removeShoppingListItem,
-        fetchAllShoppingListItems
+        fetchAllShoppingListItems,
+        fetchAllPantryItems,
+        userSettings,
     } = usePantry();
 
+    const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
     const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
     const [showMessage, setShowMessage] = useState(false);
     const [message, setMessage] = useState('');
@@ -32,15 +39,16 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
     });
     const [dropdownVisible, setDropdownVisible] = useState(false);
     const [isAddingShoppingItem, setIsAddingShoppingItem] = useState(false);
-    const [selectedIndex, setSelectedIndex] = useState(-1);  // ?∞Â?ÔºöÈçµ?§Â??™Á¥¢Âº?
+    const [isCompletingAll, setIsCompletingAll] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(-1);  // ?ùù????ùù??ù?ù?
 
-    // Shopping item search dropdownÔºàÁõ¥?•Áî® nameÔºåÈâ§Â≠êÂÖß debounceÔº?
+    // Shopping item search dropdown???ù? name???? debounceù?
     const { filteredIngredients: filteredShoppingIngredients, loading: shoppingLoading } = useSearchIngredients(
         newShoppingItem.name,
         ingredients
     );
 
-    // Auto-select if exactly one match and exact name matchÔºàÁî® useMemo ?™Â?ÔºåÈÅø?çÂæ™?∞Ô?
+    // Auto-select if exactly one match and exact name match?? useMemo ?ùù????ù??ùù?
     const autoSelectLogic = useMemo(() => {
         if (filteredShoppingIngredients.length === 1) {
             const match = filteredShoppingIngredients[0];
@@ -48,7 +56,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                 setNewShoppingItem(prev => ({
                     ...prev,
                     name: match.name,
-                    unit: match.default_unit || '',
+                    unit: preferredUnitForIngredient(match, measurementSystem).unit,
                 }));
                 setDropdownVisible(false);
             }
@@ -83,11 +91,11 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
         setShoppingList(oriShoppingList);
     }, [oriShoppingList]);
 
-    // ?∞Â?ËºîÂä©?ΩÊï∏ÔºöÈÅ∏?áÊ???
+    // ?ùù????ù????ùù???
     const handleSelectIngredient = (ingredient: IngredientEntry) => {
         setNewShoppingItem({
             name: ingredient.name,
-            unit: ingredient.default_unit || '',
+            unit: preferredUnitForIngredient(ingredient, measurementSystem).unit,
             quantity: 1,
             checked: false
         });
@@ -121,7 +129,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
         if (!item) return;
         const updatedItem = { ...item, checked: !item.checked };
         const res = await updateShoppingListItem(updatedItem);
-        if (res.success && res.data) {
+        if (res.success) {
             setShoppingList(prevList =>
                 prevList.map(listItem =>
                     listItem.id === id
@@ -134,8 +142,10 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                 setShoppingSearchQuery('');
             }
 
+            await fetchAllPantryItems();
+
             const newChecked = updatedItem.checked;
-            setMessage(newChecked ? 'Purchased! Added to your pantry. To Buy updated.' : 'Unmarked. To Buy restored.');
+            setMessage(newChecked ? 'Purchased! Added to your pantry.' : 'Unmarked. Quantity restored in pantry.');
             setShowMessage(true);
             setTimeout(() => setShowMessage(false), 3000);
         }
@@ -147,15 +157,55 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
         }
     };
 
+    const uncheckedCount = useMemo(
+        () => shoppingList.filter(item => !item.checked).length,
+        [shoppingList]
+    );
+
+    const handleCompleteAll = async () => {
+        const unchecked = shoppingList.filter(item => !item.checked);
+        if (unchecked.length === 0 || isCompletingAll) return;
+
+        setIsCompletingAll(true);
+        try {
+            const results = await Promise.all(
+                unchecked.map(item => updateShoppingListItem({ ...item, checked: true }))
+            );
+            const allSucceeded = results.every(res => res.success);
+            if (allSucceeded) {
+                setShoppingList(prevList =>
+                    prevList.map(listItem =>
+                        listItem.checked ? listItem : { ...listItem, checked: true }
+                    )
+                );
+                if (shoppingSearchQuery) {
+                    setShoppingSearchQuery('');
+                }
+                await fetchAllPantryItems();
+                setMessage(`All ${unchecked.length} item${unchecked.length === 1 ? '' : 's'} purchased and added to your pantry.`);
+                setShowMessage(true);
+                setTimeout(() => setShowMessage(false), 3000);
+            } else {
+                await fetchAllShoppingListItems();
+                await fetchAllPantryItems();
+                setMessage('Some items could not be completed. Please try again.');
+                setShowMessage(true);
+                setTimeout(() => setShowMessage(false), 3000);
+            }
+        } finally {
+            setIsCompletingAll(false);
+        }
+    };
+
     return (
         <div className="flex flex-col w-full min-h-screen bg-linen">
             <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
                 {/* Page title */}
                 <div className="max-w-3xl mx-auto px-6 lg:px-8 py-6 flex items-center gap-4">
-                    <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
+                    <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label={t('common.back')}>
                         <ArrowLeftIcon size={22} />
                     </button>
-                    <h1 className="page-title animate-fade-in">Shopping List</h1>
+                    <h1 className="page-title animate-fade-in">{t('shopping.title')}</h1>
                 </div>
 
                 {/* Main Content */}
@@ -174,7 +224,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                         </div>
                         <input
                             type="text"
-                            placeholder="Search shopping items..."
+                            placeholder={t('shopping.searchPlaceholder')}
                             value={shoppingSearchQuery}
                             onChange={e => setShoppingSearchQuery(e.target.value)}
                             className="w-full pl-10 pr-4 py-3 rounded-xl border border-line focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent"
@@ -188,21 +238,21 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                             className="w-full flex items-center justify-center gap-2 bg-surface border border-line hover:bg-linen text-ink font-medium py-3 px-4 rounded-xl mb-6 shadow-sm transition-colors"
                         >
                             <PlusIcon size={18} />
-                            <span>Add New Shopping Item</span>
+                            <span>{t('shopping.addItem')}</span>
                         </button>
                     ) : (
                         <div className="bg-surface p-4 rounded-xl shadow-sm border border-line mb-6">
-                            <h3 className="font-medium text-ink mb-3">Add Item to Shopping List</h3>
+                            <h3 className="font-medium text-ink mb-3">{t('shopping.addItemTitle')}</h3>
                             <div className="space-y-3 relative">
                                 <input
                                     type="text"
-                                    placeholder="Search or add item name"
+                                    placeholder={t('shopping.itemNamePlaceholder')}
                                     value={newShoppingItem.name}
                                     onChange={(e) => {
                                         const newName = e.target.value;
                                         setNewShoppingItem({ ...newShoppingItem, name: newName });
                                         setDropdownVisible(newName.length > 0);
-                                        setSelectedIndex(-1);  // ?çÁΩÆ?∏Ê?
+                                        setSelectedIndex(-1);  // ?ù??ùù?
                                     }}
                                     onKeyDown={(e) => {
                                         if (!dropdownVisible || filteredShoppingIngredients.length === 0) return;
@@ -239,7 +289,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                 />
 
                                 {dropdownVisible && (
-                                    <ul className="absolute z-10 w-full bg-surface border border-line rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
+                                    <ul className="absolute z-30 w-full bg-surface border border-line rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
                                         {shoppingLoading ? (
                                             <li className="p-3 text-center text-muted text-sm flex items-center justify-center">
                                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
@@ -248,7 +298,6 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                         ) : filteredShoppingIngredients.length > 0 ? (
                                             filteredShoppingIngredients.map((ingredient: IngredientEntry, index: number) => {
                                                 const isSelected = index === selectedIndex;
-                                                // È´ò‰∫Æ?πÈ??áÂ?ÔºàÁ∞°?ÆÂØ¶?æÔ?
                                                 const query = newShoppingItem.name.toLowerCase();
                                                 const highlightedName = ingredient.name.replace(
                                                     new RegExp(`(${query})`, 'gi'),
@@ -257,9 +306,13 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                                 return (
                                                     <li key={ingredient.id} className={`p-3 ${isSelected ? 'bg-sage/50' : 'hover:bg-sage/50'}`}>
                                                         <button
-                                                            onClick={() => handleSelectIngredient(ingredient)}
+                                                            type="button"
+                                                            onMouseDown={e => {
+                                                                e.preventDefault();
+                                                                handleSelectIngredient(ingredient);
+                                                            }}
                                                             className={`w-full text-left ${isSelected ? 'font-medium' : ''}`}
-                                                            dangerouslySetInnerHTML={{ __html: highlightedName + ` <span class="text-sm text-muted">(${ingredient.default_unit})</span>` }}
+                                                            dangerouslySetInnerHTML={{ __html: highlightedName + ` <span class="text-sm text-muted">(${ingredient.default_display_unit || ingredient.default_unit || ''})</span>` }}
                                                         />
                                                     </li>
                                                 );
@@ -285,12 +338,18 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                         }
                                         className="w-1/3 p-2 rounded-lg"
                                     />
-                                    <input
-                                        type="text"
-                                        placeholder="Unit (g, ml, etc.)"
+                                    <UnitSelect
+                                        kind={preferredUnitForIngredient(
+                                            ingredients.find(i => i.name.toLowerCase() === newShoppingItem.name.toLowerCase()) || {
+                                                default_unit: newShoppingItem.unit,
+                                            },
+                                            measurementSystem
+                                        ).kind}
                                         value={newShoppingItem.unit}
-                                        onChange={(e) => setNewShoppingItem({ ...newShoppingItem, unit: e.target.value })}
-                                        className="w-2/3 p-2 border border-line rounded-lg"
+                                        onChange={unit => setNewShoppingItem({ ...newShoppingItem, unit })}
+                                        measurementSystem={measurementSystem}
+                                        preferSystemUnits
+                                        className="w-2/3 p-2 border border-line rounded-lg bg-surface"
                                     />
                                 </div>
 
@@ -314,12 +373,26 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                     )}
 
                     <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden">
-                        <div className="p-4 border-b border-line bg-linen">
-                            <h2 className="font-semibold text-ink">Items to Buy</h2>
+                        <div className="p-4 border-b border-line bg-linen flex items-center justify-between gap-3">
+                            <h2 className="font-semibold text-ink">{t('shopping.itemsToBuy')}</h2>
+                            <button
+                                type="button"
+                                onClick={handleCompleteAll}
+                                disabled={uncheckedCount === 0 || isCompletingAll}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                    uncheckedCount === 0 || isCompletingAll
+                                        ? 'bg-sage/30 text-muted cursor-not-allowed'
+                                        : 'bg-herb text-white hover:bg-herb-deep'
+                                }`}
+                                aria-label="Complete all items"
+                            >
+                                <CheckIcon size={14} />
+                                {isCompletingAll ? 'Completingù' : 'Complete all'}
+                            </button>
                         </div>
                         {filteredShoppingItems.length === 0 ? (
                             <div className="p-6 text-center">
-                                <p className="text-muted">No items in your shopping list</p>
+                                <p className="text-muted">{t('shopping.empty')}</p>
                                 {shoppingSearchQuery && <p className="text-muted text-sm mt-1">Try a different search term</p>}
                             </div>
                         ) : (
@@ -336,7 +409,15 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                             </button>
                                             <div className={`flex-1 min-w-0 ${item.checked ? 'line-through opacity-50' : ''}`}>
                                                 <span className="font-semibold text-ink capitalize">{item.name}</span>
-                                                <span className="text-sm text-muted ml-2">{item.quantity} {item.unit}</span>
+                                                <QuantityLabel
+                                                    className="text-sm text-muted ml-2"
+                                                    quantity={item.quantity}
+                                                    unit={item.unit}
+                                                    unitKind={item.unit_kind}
+                                                    baseUnit={item.base_unit}
+                                                    defaultDisplayUnit={item.default_display_unit}
+                                                    measurementSystem={measurementSystem}
+                                                />
                                             </div>
                                             <button
                                                 onClick={() => handleRemoveShoppingItem(item.id)}

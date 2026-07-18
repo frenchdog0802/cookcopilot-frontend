@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   BotMessageSquare,
   HomeIcon,
@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   MoreHorizontal
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface BottomNavProps {
   activeView: string;
@@ -16,20 +17,21 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
+  const { t } = useTranslation();
   const [showMore, setShowMore] = useState(false);
 
   const primaryNav = [
-    { pageId: 'home', icon: HomeIcon, label: 'Home' },
-    { pageId: 'aiAssistant', icon: BotMessageSquare, label: 'AI Chat' },
-    { pageId: 'calendar', icon: CalendarIcon, label: 'Calendar' },
-    { pageId: 'pantryInventory', icon: PackageIcon, label: 'Pantry' }
-  ];
+    { pageId: 'home', icon: HomeIcon, labelKey: 'nav.home' },
+    { pageId: 'aiAssistant', icon: BotMessageSquare, labelKey: 'nav.aiChat' },
+    { pageId: 'calendar', icon: CalendarIcon, labelKey: 'nav.calendar' },
+    { pageId: 'pantryInventory', icon: PackageIcon, labelKey: 'nav.pantry' }
+  ] as const;
 
   const secondaryNav = [
-    { pageId: 'shoppingList', icon: ShoppingCart, label: 'Shopping' },
-    { pageId: 'recipeManager', icon: UtensilsIcon, label: 'Recipes' },
-    { pageId: 'settings', icon: SettingsIcon, label: 'Settings' }
-  ];
+    { pageId: 'shoppingList', icon: ShoppingCart, labelKey: 'nav.shopping' },
+    { pageId: 'recipeManager', icon: UtensilsIcon, labelKey: 'nav.recipes' },
+    { pageId: 'settings', icon: SettingsIcon, labelKey: 'nav.settings' }
+  ] as const;
 
   return (
     <>
@@ -51,7 +53,7 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
                   className="flex items-center w-full px-3 py-2 rounded-lg hover:bg-sage/50 text-ink"
                 >
                   <Icon size={18} className="mr-3 text-muted" />
-                  <span className="text-sm font-medium">{item.label}</span>
+                  <span className="text-sm font-medium">{t(item.labelKey)}</span>
                 </button>
               );
             })}
@@ -77,7 +79,7 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
                 }`}
               >
                 <Icon size={20} className={isActive ? 'stroke-[2.5]' : ''} />
-                <span className="text-[10px] mt-0.5 font-medium">{item.label}</span>
+                <span className="text-[10px] mt-0.5 font-medium">{t(item.labelKey)}</span>
               </button>
             );
           })}
@@ -89,7 +91,7 @@ export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
             }`}
           >
             <MoreHorizontal size={20} />
-            <span className="text-[10px] mt-0.5 font-medium">More</span>
+            <span className="text-[10px] mt-0.5 font-medium">{t('common.more')}</span>
           </button>
         </div>
       </nav>

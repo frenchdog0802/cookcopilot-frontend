@@ -1,9 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, SearchIcon, CalendarIcon, EditIcon, XIcon, ImageIcon, PackageIcon, FolderIcon, ChevronRightIcon, HomeIcon, MoreVerticalIcon, FolderPlusIcon, PencilIcon, AlertCircleIcon } from 'lucide-react';
 import { usePantry } from '../contexts/pantryContext';
 import { IngredientEntry, Folder, Recipe } from '../api/types';
 import { ImageUploadApi } from '../api/ImageUploader';
 import { compressImage } from '../utils/imageHelper';
+import { Loading } from './Loading';
+import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from './UnitSelect';
+import { fromBase, resolveIngredientUnits, type MeasurementSystem } from '../utils/units';
 
 
 interface RecipeManagerProps {
@@ -17,8 +21,10 @@ export function RecipeManager({
   selectedRecipeId,
   onSelectedRecipeHandled,
 }: RecipeManagerProps) {
+  const { t } = useTranslation();
   const {
     recipes: storedRecipes,
+    recipesLoading,
     addRecipe,
     updateRecipe,
     deleteRecipe,
@@ -30,8 +36,9 @@ export function RecipeManager({
     folders: savedFolders,
     ingredients,
     fetchAllIngredients,
+    userSettings,
   } = usePantry();
-  const [searchQuery, setSearchQuery] = useState('');
+  const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;  const [searchQuery, setSearchQuery] = useState('');
   const [showAddRecipe, setShowAddRecipe] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -73,6 +80,10 @@ export function RecipeManager({
   }, [storedRecipes]);
 
   useEffect(() => {
+    setFolders(savedFolders);
+  }, [savedFolders]);
+
+  useEffect(() => {
     if (!selectedRecipeId || recipes.length === 0) {
       return;
     }
@@ -83,55 +94,30 @@ export function RecipeManager({
     }
   }, [selectedRecipeId, recipes, onSelectedRecipeHandled]);
 
-  useEffect(() => {
-    // If no folders exist, initialize default ones
-    if (savedFolders.length === 0) {
-      initializeDefaultFolders();
+  // Default folders are created/deduped by the backend on GET /api/folder.
+  const uncategorizedFolderId =
+    folders.find(folder => folder.name.toLowerCase() === 'uncategorized')?.id ?? '';
+
+  const recipeFolderId = (recipe: Recipe) =>
+    recipe.folder_id || uncategorizedFolderId;
+
+  const hasRecipeImage = (recipe: Recipe | null | undefined) =>
+    Boolean(recipe?.image?.url);
+
+  const getInstructionsText = (recipe: Recipe) =>
+    (recipe.instructions || []).join('\n');
+
+  const setInstructionsFromText = (text: string, target: 'selected' | 'new') => {
+    const instructions = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if (target === 'selected' && selectedRecipe) {
+      setSelectedRecipe({ ...selectedRecipe, instructions });
+    } else {
+      setNewRecipe(prev => ({ ...prev, instructions }));
     }
-  }, [savedFolders]);
-
-
-  // Initialize default folders
-  const initializeDefaultFolders = () => {
-    const defaultFolders = [{
-      id: 'uncategorized',
-      name: 'Uncategorized',
-      icon: 'FolderIcon',
-      createdAt: Date.now()
-    }, {
-      id: 'favorites',
-      name: 'Favorites',
-      icon: 'FolderIcon',
-      createdAt: Date.now()
-    }, {
-      id: 'breakfast',
-      name: 'Breakfast',
-      icon: 'FolderIcon',
-      createdAt: Date.now()
-    }, {
-      id: 'lunch',
-      name: 'Lunch',
-      icon: 'FolderIcon',
-      createdAt: Date.now()
-    }, {
-      id: 'dinner',
-      name: 'Dinner',
-      icon: 'FolderIcon',
-      createdAt: Date.now()
-    }];
-
-    defaultFolders.forEach(folder => {
-      addFolder(folder);
-    });
-    setFolders(defaultFolders);
-
   };
 
-
-
-  // Filter recipes based on search query
   const filteredRecipes = recipes.filter(recipe => {
-    if (currentFolder && recipe.folder_id !== currentFolder.id) {
+    if (currentFolder && recipeFolderId(recipe) !== currentFolder.id) {
       return false;
     }
     const matchesSearch = recipe.ingredients && recipe.ingredients.some(item => item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())) || recipe.meal_name && recipe.meal_name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -167,15 +153,15 @@ export function RecipeManager({
   const handleDeleteFolder = () => {
     if (!folderToDelete) return;
     // Move all recipes in this folder to Uncategorized
-    recipes.filter(recipe => recipe.folder_id === folderToDelete.id).forEach(recipe => {
+    recipes.filter(recipe => recipeFolderId(recipe) === folderToDelete.id).forEach(recipe => {
       updateRecipe({
         ...recipe,
-        folder_id: 'uncategorized'
+        folder_id: uncategorizedFolderId
       });
     });
-    setRecipes(prev => prev.map(recipe => recipe.folder_id === folderToDelete.id ? {
+    setRecipes(prev => prev.map(recipe => recipeFolderId(recipe) === folderToDelete.id ? {
       ...recipe,
-      folder_id: 'uncategorized'
+      folder_id: uncategorizedFolderId
     } : recipe));
     // Remove the folder
     setFolders((folders ?? []).filter(folder => folder.id !== folderToDelete.id));
@@ -188,13 +174,36 @@ export function RecipeManager({
     deleteFolder(folderToDelete.id);
   };
 
-  const handleSelectIngredient = (pantryItem: any, index: number) => {
+  const toEditRecipe = (recipe: Recipe): Recipe => ({
+    ...recipe,
+    ingredients: recipe.ingredients.map(item => {
+      const preferred = preferredUnitForIngredient(item, measurementSystem);
+      const resolved = resolveIngredientUnits(item);
+      const qty = Number(item.quantity) || 0;
+      const displayQty = resolved.kind === 'count'
+        ? qty
+        : fromBase(qty, preferred.unit, resolved.kind);
+      return {
+        ...item,
+        quantity: Math.round(displayQty * 1000) / 1000,
+        unit: preferred.unit,
+        unit_kind: resolved.kind,
+      };
+    }),
+  });
+
+  const handleSelectIngredient = (pantryItem: IngredientEntry, index: number) => {
+    const preferred = preferredUnitForIngredient(pantryItem, measurementSystem);
     if (isEditing && selectedRecipe) {
       const updatedItems = [...selectedRecipe.ingredients];
       updatedItems[index] = {
         ...updatedItems[index],
         name: pantryItem.name,
-        unit: pantryItem.default_unit
+        unit: preferred.unit,
+        unit_kind: preferred.kind,
+        base_unit: pantryItem.base_unit,
+        default_display_unit: pantryItem.default_display_unit,
+        ingredient_id: pantryItem.id,
       };
       setSelectedRecipe({
         ...selectedRecipe,
@@ -205,7 +214,11 @@ export function RecipeManager({
       updatedItems[index] = {
         ...updatedItems[index],
         name: pantryItem.name,
-        unit: pantryItem.default_unit
+        unit: preferred.unit,
+        unit_kind: preferred.kind,
+        base_unit: pantryItem.base_unit,
+        default_display_unit: pantryItem.default_display_unit,
+        ingredient_id: pantryItem.id,
       };
       setNewRecipe({
         ...newRecipe,
@@ -365,7 +378,7 @@ export function RecipeManager({
       // Skip pantry availability validation per request
       const recipeToAdd = {
         ...newRecipe,
-        folder_id: newRecipe.folder_id || (currentFolder ? currentFolder.id : 'uncategorized')
+        folder_id: newRecipe.folder_id || (currentFolder ? currentFolder.id : uncategorizedFolderId)
       };
       addRecipe(recipeToAdd);
       setRecipes(prev => [...prev, recipeToAdd]);
@@ -373,11 +386,8 @@ export function RecipeManager({
         id: '',
         meal_name: '',
         ingredients: [],
-        image: {
-          url: '',
-          public_id: '',
-        },
-        folder_id: currentFolder ? currentFolder.id : 'uncategorized',
+        image: null,
+        folder_id: currentFolder ? currentFolder.id : uncategorizedFolderId,
         instructions: [] as string[],
       });
       setNewRecipeError('');
@@ -434,19 +444,19 @@ export function RecipeManager({
     <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
       {/* Page title */}
       <div className="max-w-6xl mx-auto px-6 lg:px-8 py-6 flex items-center gap-4">
-        <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
+        <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label={t('common.back')}>
           <ArrowLeftIcon size={22} />
         </button>
-        <h1 className="page-title animate-fade-in">Recipe Manager</h1>
+        <h1 className="page-title animate-fade-in">{t('recipes.title')}</h1>
       </div>
       {/* Main Content */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 lg:px-8 py-6">
-        {!showAddRecipe && !selectedRecipe ? <>
+        {!showAddRecipe && !selectedRecipe && recipesLoading && recipes.length === 0 ? <Loading /> : !showAddRecipe && !selectedRecipe ? <>
           {/* Breadcrumb Navigation */}
           <div className="flex items-center mb-4 text-sm">
             <button onClick={() => setCurrentFolder(null)} className="flex items-center text-muted hover:text-ink">
               <HomeIcon size={16} className="mr-1" />
-              <span>Categories</span>
+              <span>{t('recipes.categories')}</span>
             </button>
             {currentFolder && <>
               <ChevronRightIcon size={16} className="mx-2 text-muted" />
@@ -479,7 +489,7 @@ export function RecipeManager({
                     </h3>
                   </div>
                   <p className="text-sm text-muted">
-                    {recipes.filter(r => r.folder_id === folder.id).length}{' '}
+                    {recipes.filter(r => recipeFolderId(r) === folder.id).length}{' '}
                     recipes
                   </p>
                 </div>
@@ -497,7 +507,7 @@ export function RecipeManager({
                       setEditingFolder(folder);
                       setNewFolderName(folder.name);
                       setShowFolderActions(null);
-                    }} className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-linen flex items-center" disabled={folder.id === 'uncategorized'}>
+                    }} className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-linen flex items-center" disabled={folder.name.toLowerCase() === 'uncategorized'}>
                       <PencilIcon size={14} className="mr-2" />
                       Rename
                     </button>
@@ -509,7 +519,7 @@ export function RecipeManager({
                       <PlusIcon size={14} className="mr-2" />
                       Add Recipe
                     </button>
-                    {folder.id !== 'uncategorized' && <button onClick={e => {
+                    {folder.name.toLowerCase() !== 'uncategorized' && <button onClick={e => {
                       e.stopPropagation();
                       setFolderToDelete(folder);
                       setShowDeleteFolderConfirmation(true);
@@ -537,7 +547,7 @@ export function RecipeManager({
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <SearchIcon size={18} className="text-muted" />
               </div>
-              <input type="text" placeholder="Search recipes..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-line focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent" />
+              <input type="text" placeholder={t('recipes.searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-line focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent" />
             </div>
             {/* Add New Recipe Button */}
             <button onClick={() => {
@@ -548,14 +558,14 @@ export function RecipeManager({
               setShowAddRecipe(true);
             }} className="w-full flex items-center justify-center gap-2 bg-surface border border-line hover:bg-linen text-ink font-medium py-3 px-4 rounded-xl mb-6 shadow-sm transition-colors">
               <PlusIcon size={18} />
-              <span>Add New Recipe</span>
+              <span>{t('recipes.addRecipe')}</span>
             </button>
             {/* Recipes List */}
             <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden">
               {filteredRecipes.length === 0 ? <div className="p-6 text-center">
-                <p className="text-muted">No recipes found</p>
+                <p className="text-muted">{t('recipes.empty')}</p>
                 {searchQuery && <p className="text-muted text-sm mt-1">
-                  Try a different search term
+                  {t('common.tryDifferentSearch')}
                 </p>}
               </div> : <ul className="divide-y divide-line">
                 {filteredRecipes.map(recipe => <li key={recipe.id} className="p-4">
@@ -565,7 +575,7 @@ export function RecipeManager({
                       setIsEditing(false);
                     }}>
                       <div className="flex items-center mb-1">
-                        {recipe.image && <ImageIcon size={16} className="ml-2 text-muted" />}
+                        {hasRecipeImage(recipe) && <ImageIcon size={16} className="ml-2 text-muted" />}
                       </div>
                       {/* Fixed: Added missing meal_name display */}
                       <h3 className="font-medium text-ink mb-1">
@@ -578,7 +588,7 @@ export function RecipeManager({
                     </div>
                     <div className="flex flex-col space-y-2">
                       <button onClick={() => {
-                        setSelectedRecipe(recipe);
+                        setSelectedRecipe(toEditRecipe(recipe));
                         setIsEditing(true);
                       }} className="p-1.5 rounded-full hover:bg-sage/50 text-herb" aria-label="Edit recipe">
                         <EditIcon size={18} />
@@ -629,7 +639,7 @@ export function RecipeManager({
                       Meal Photo{' '}
                       (optional)
                     </label>
-                    {!selectedRecipe.image ? <div className="border-2 border-dashed border-line rounded-xl p-6 text-center">
+                    {!hasRecipeImage(selectedRecipe) ? <div className="border-2 border-dashed border-line rounded-xl p-6 text-center">
                       <ImageIcon size={24} className="mx-auto text-muted mb-2" />
                       <p className="text-muted mb-2">
                         Add a photo of your meal
@@ -639,11 +649,25 @@ export function RecipeManager({
                         <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                       </label>
                     </div> : <div className="relative rounded-xl overflow-hidden h-40">
-                      <img src={selectedRecipe.image.url} alt="Meal" className="w-full h-full object-cover" />
-                      <button onClick={() => handleImageRemove(selectedRecipe.image.public_id)} className="absolute top-2 right-2 bg-surface/80 p-1 rounded-full hover:bg-surface text-herb" aria-label="Remove image">
+                      <img src={selectedRecipe.image!.url} alt="Meal" className="w-full h-full object-cover" />
+                      <button onClick={() => handleImageRemove(selectedRecipe.image!.public_id)} className="absolute top-2 right-2 bg-surface/80 p-1 rounded-full hover:bg-surface text-herb" aria-label="Remove image">
                         <XIcon size={20} />
                       </button>
                     </div>}
+                  </div>
+                  {/* Instructions / Steps */}
+                  <div>
+                    <label htmlFor="instructions-edit" className="block text-ink text-sm font-medium mb-1">
+                      Instructions / Steps
+                    </label>
+                    <textarea
+                      id="instructions-edit"
+                      value={getInstructionsText(selectedRecipe)}
+                      onChange={e => setInstructionsFromText(e.target.value, 'selected')}
+                      placeholder="One step per line"
+                      rows={6}
+                      className="w-full p-3 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent resize-y"
+                    />
                   </div>
                   {/* Items List */}
                   <div>
@@ -673,20 +697,30 @@ export function RecipeManager({
                         </div>
 
                         {/* Dropdown Menu */}
-                        {showIngredientDropdown && activeItemIndex === index && <div className="absolute z-20 w-full mt-1 bg-surface border border-line rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                          {getFilteredPantryItems(itemSearchQuery).length > 0 ? getFilteredPantryItems(itemSearchQuery).map(pantryItem => <button key={pantryItem.name} type="button" onClick={() => handleSelectIngredient(pantryItem, index)} className="w-full text-left px-3 py-2 hover:bg-sage/50 transition-colors text-sm border-b border-line last:border-b-0">
+                        {showIngredientDropdown && activeItemIndex === index && <div className="absolute z-30 w-full mt-1 bg-surface border border-line rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          {getFilteredPantryItems(itemSearchQuery).length > 0 ? getFilteredPantryItems(itemSearchQuery).map(pantryItem => <button key={pantryItem.id || pantryItem.name} type="button" onMouseDown={e => {
+                            e.preventDefault();
+                            handleSelectIngredient(pantryItem, index);
+                          }} className="w-full text-left px-3 py-2 hover:bg-sage/50 transition-colors text-sm border-b border-line last:border-b-0">
                             <div className="font-medium text-ink capitalize">
                               {pantryItem.name}
                             </div>
                             <div className="text-xs text-muted">
-                              {pantryItem.default_unit}
+                              {pantryItem.default_display_unit || pantryItem.default_unit}
                             </div>
                           </button>) : <div></div>}
                         </div>}
                       </div>
 
-                      <input type="number" min="1" value={item.quantity} onChange={e => handleUpdateRecipeItem(index, 'quantity', e.target.value)} className="w-16 p-2 border border-line rounded-lg" />
-                      <input type="text" value={item.unit} onChange={e => handleUpdateRecipeItem(index, 'unit', e.target.value)} placeholder="Unit" className="w-16 p-2 border border-line rounded-lg" />
+                      <input type="number" min="0.1" step="any" value={item.quantity} onChange={e => handleUpdateRecipeItem(index, 'quantity', e.target.value)} className="w-16 p-2 border border-line rounded-lg" />
+                      <UnitSelect
+                        kind={item.unit_kind || preferredUnitForIngredient({ default_unit: item.unit, unit_kind: item.unit_kind, base_unit: item.base_unit, default_display_unit: item.default_display_unit }, measurementSystem).kind}
+                        value={item.unit}
+                        onChange={unit => handleUpdateRecipeItem(index, 'unit', unit)}
+                        measurementSystem={measurementSystem}
+                        preferSystemUnits
+                        className="w-20 p-2 border border-line rounded-lg bg-surface"
+                      />
                       <button onClick={() => handleRemoveRecipeItem(index)} className="p-1 rounded-full hover:bg-sage/50 text-herb">
                         <TrashIcon size={16} />
                       </button>
@@ -714,8 +748,8 @@ export function RecipeManager({
                       {/* Fixed: Removed empty <p>&nbsp;</p> */}
                     </div>
                   </div>
-                  {selectedRecipe.image && <div className="rounded-xl overflow-hidden h-40 my-4">
-                    <img src={selectedRecipe.image.url} alt="Meal" className="w-full h-full object-cover" />
+                  {hasRecipeImage(selectedRecipe) && <div className="rounded-xl overflow-hidden h-40 my-4">
+                    <img src={selectedRecipe.image!.url} alt="Meal" className="w-full h-full object-cover" />
                   </div>}
                   <div className="border-t border-b border-line py-4">
                     <h4 className="font-medium text-ink mb-2">
@@ -725,15 +759,44 @@ export function RecipeManager({
                       {selectedRecipe.ingredients.map((item, index) => <li key={index} className="flex justify-between">
                         <div>
                           <span className="text-ink">{item.name}</span>
-                          <span className="text-muted text-sm ml-2">
-                            ({item.quantity} {item.unit})
-                          </span>
+                          {Number(item.quantity) > 0 && (
+                          <QuantityLabel
+                            className="text-muted text-sm ml-2"
+                            quantity={Number(item.quantity)}
+                            unit={item.unit}
+                            unitKind={item.unit_kind}
+                            baseUnit={item.base_unit}
+                            defaultDisplayUnit={item.default_display_unit}
+                            measurementSystem={measurementSystem}
+                          />
+                          )}
                         </div>
                       </li>)}
                     </ul>
                   </div>
+                  {(selectedRecipe.instructions?.length ?? 0) > 0 && (
+                    <div className="border-b border-line pb-4">
+                      <h4 className="font-medium text-ink mb-2">
+                        Instructions
+                      </h4>
+                      <ol className="space-y-3">
+                        {selectedRecipe.instructions.map((step, index) => (
+                          <li key={index} className="flex">
+                            <div className="bg-sage rounded-full w-6 h-6 flex items-center justify-center text-herb-deep font-medium mr-3 flex-shrink-0 mt-0.5 text-sm">
+                              {index + 1}
+                            </div>
+                            <p className="text-ink">{step}</p>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
                   <div className="flex gap-2 pt-4">
-                    <button onClick={() => setIsEditing(true)} className="w-1/2 bg-sage/50 text-herb border border-blue-100 py-2 rounded-lg flex items-center justify-center">
+                    <button onClick={() => {
+                      if (!selectedRecipe) return;
+                      setSelectedRecipe(toEditRecipe(selectedRecipe));
+                      setIsEditing(true);
+                    }} className="w-1/2 bg-sage/50 text-herb border border-blue-100 py-2 rounded-lg flex items-center justify-center">
                       <EditIcon size={16} className="mr-1" />
                       Edit Recipe
                     </button>
@@ -759,7 +822,7 @@ export function RecipeManager({
           // Add New Recipe Form
           <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden mb-6">
             <div className="p-4 border-b border-line bg-linen flex justify-between items-center">
-              <h2 className="font-semibold text-ink">Add New Recipe</h2>
+              <h2 className="font-semibold text-ink">{t('recipes.addRecipe')}</h2>
               <button onClick={() => setShowAddRecipe(false)} className="p-1 rounded-full hover:bg-sage/60" aria-label="Close">
                 <XIcon size={18} className="text-muted" />
               </button>
@@ -777,7 +840,7 @@ export function RecipeManager({
                   <label className="block text-ink mb-2">
                     Recipe Image (optional)
                   </label>
-                  {!newRecipe.image ? (
+                  {!hasRecipeImage(newRecipe) ? (
                     <div className="border-2 border-dashed border-line rounded-xl p-6 text-center">
                       <ImageIcon size={32} className="mx-auto text-muted mb-2" />
                       <p className="text-muted mb-2">Add a photo of your Recipe</p>
@@ -789,7 +852,7 @@ export function RecipeManager({
                   ) : (
                     <div className="relative rounded-xl overflow-hidden aspect-[4/3]">
                       <img
-                        src={newRecipe.image.url}
+                        src={newRecipe.image!.url}
                         alt="Recipe photo"
                         className="w-full h-full object-cover"
                         loading="lazy"
@@ -804,6 +867,20 @@ export function RecipeManager({
                       </button>
                     </div>
                   )}
+                </div>
+                {/* Instructions / Steps */}
+                <div>
+                  <label htmlFor="instructions-new" className="block text-ink mb-2">
+                    Instructions / Steps
+                  </label>
+                  <textarea
+                    id="instructions-new"
+                    value={getInstructionsText(newRecipe)}
+                    onChange={e => setInstructionsFromText(e.target.value, 'new')}
+                    placeholder="One step per line"
+                    rows={5}
+                    className="w-full p-3 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent resize-y"
+                  />
                 </div>
                 {/* Items List */}
                 <div>
@@ -834,20 +911,30 @@ export function RecipeManager({
                       </div>
 
                       {/* Dropdown Menu */}
-                      {showIngredientDropdown && activeItemIndex === index && <div className="absolute z-20 w-full mt-1 bg-surface border border-line rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {getFilteredPantryItems(itemSearchQuery).length > 0 ? getFilteredPantryItems(itemSearchQuery).map(pantryItem => <button key={pantryItem.name} type="button" onClick={() => handleSelectIngredient(pantryItem, index)} className="w-full text-left px-3 py-2 hover:bg-sage/50 transition-colors text-sm border-b border-line last:border-b-0">
+                      {showIngredientDropdown && activeItemIndex === index && <div className="absolute z-30 w-full mt-1 bg-surface border border-line rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {getFilteredPantryItems(itemSearchQuery).length > 0 ? getFilteredPantryItems(itemSearchQuery).map(pantryItem => <button key={pantryItem.id || pantryItem.name} type="button" onMouseDown={e => {
+                          e.preventDefault();
+                          handleSelectIngredient(pantryItem, index);
+                        }} className="w-full text-left px-3 py-2 hover:bg-sage/50 transition-colors text-sm border-b border-line last:border-b-0">
                           <div className="font-medium text-ink capitalize">
                             {pantryItem.name}
                           </div>
                           <div className="text-xs text-muted">
-                            {pantryItem.default_unit}{' '}
+                            {pantryItem.default_display_unit || pantryItem.default_unit}
                           </div>
                         </button>) : <div></div>}
                       </div>}
                     </div>
 
-                    <input type="number" min="1" value={item.quantity} onChange={e => handleUpdateRecipeItem(index, 'quantity', e.target.value)} className="w-14 p-2 text-sm border border-line rounded-lg" />
-                    <input type="text" value={item.unit} onChange={e => handleUpdateRecipeItem(index, 'unit', e.target.value)} placeholder="Unit" className="w-14 p-2 text-sm border border-line rounded-lg" />
+                    <input type="number" min="0.1" step="any" value={item.quantity} onChange={e => handleUpdateRecipeItem(index, 'quantity', e.target.value)} className="w-14 p-2 text-sm border border-line rounded-lg" />
+                    <UnitSelect
+                      kind={item.unit_kind || preferredUnitForIngredient({ default_unit: item.unit, unit_kind: item.unit_kind, base_unit: item.base_unit, default_display_unit: item.default_display_unit }, measurementSystem).kind}
+                      value={item.unit}
+                      onChange={unit => handleUpdateRecipeItem(index, 'unit', unit)}
+                      measurementSystem={measurementSystem}
+                      preferSystemUnits
+                      className="w-16 p-2 text-sm border border-line rounded-lg bg-surface"
+                    />
                     <button onClick={() => handleRemoveRecipeItem(index)} className="p-1 rounded-full hover:bg-sage/50 text-herb" aria-label={`Remove ${item.name || 'item'}`}>
                       <TrashIcon size={16} />
                       <span className="sr-only">Remove {item.name || 'item'}</span>

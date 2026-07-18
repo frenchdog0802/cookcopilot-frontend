@@ -81,17 +81,24 @@ function AppContent() {
     <div className={currentView !== 'login' && currentView !== 'signup' ? 'lg:pl-60' : ''}>
       {currentView === 'login' && <Login onLoginSuccess={navigateToHome} onSignUp={navigateToSignUp} />}
       {currentView === 'home' && isAuthenticated && <Home onLogin={navigateToLogin} onCookWithWhatIHave={navigateToAiAssistant} onViewCalendar={navigateToCalendar} onPantryInventory={navigateToPantryInventory} onShoppingList={navigateToShoppingList} onRecipeManager={navigateToRecipeManager} onSettings={navigateToSettings} />}
-      {currentView === 'aiAssistant' && isAuthenticated && (
-        <AICookingAssistant
-          onBack={navigateToHome}
-          onViewRecipe={(recipeId) => {
-            setSelectedRecipeId(recipeId);
-            setCurrentView('recipeManager');
-          }}
-          onViewShoppingList={navigateToShoppingList}
-          onViewCalendar={navigateToCalendar}
-          onViewPantry={navigateToPantryInventory}
-        />
+      {/* Keep chat mounted so streaming continues in the background when switching tabs */}
+      {isAuthenticated && (
+        <div
+          className={currentView === 'aiAssistant' ? undefined : 'hidden'}
+          aria-hidden={currentView !== 'aiAssistant'}
+        >
+          <AICookingAssistant
+            isActive={currentView === 'aiAssistant'}
+            onBack={navigateToHome}
+            onViewRecipe={(recipeId) => {
+              setSelectedRecipeId(recipeId);
+              setCurrentView('recipeManager');
+            }}
+            onViewShoppingList={navigateToShoppingList}
+            onViewCalendar={navigateToCalendar}
+            onViewPantry={navigateToPantryInventory}
+          />
+        </div>
       )}
       {currentView === 'calendar' && isAuthenticated && <Calendar onBack={navigateToHome} />}
       {currentView === 'recipeManager' && isAuthenticated && (

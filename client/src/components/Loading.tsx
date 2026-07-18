@@ -1,12 +1,16 @@
+import { useTranslation } from 'react-i18next';
+
 interface LoadingProps {
   fullScreen?: boolean;
 }
 
 export function Loading({ fullScreen }: LoadingProps) {
+  const { t } = useTranslation();
+
   const content = (
     <>
       <div className="animate-spin rounded-full h-12 w-12 border-2 border-line border-t-herb mb-4"></div>
-      <p className="text-muted text-sm">Loading...</p>
+      <p className="text-muted text-sm">{t('common.loading')}</p>
     </>
   );
 

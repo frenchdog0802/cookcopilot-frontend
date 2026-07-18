@@ -38,6 +38,7 @@ export interface StreamSendHandlers {
     onToken: (token: string) => void;
     onDone: (response: ChatResponse) => void;
     onError: (message: string) => void;
+    onStatus?: (status: { tool?: string; message: string }) => void;
 }
 
 export const CARD_RESPONSE_TYPES: ChatResponseType[] = [
@@ -98,6 +99,19 @@ function parseSseEvent(block: string, handlers: StreamSendHandlers) {
         return;
     }
 
+    if (eventName === 'status') {
+        try {
+            const parsed = JSON.parse(data) as { tool?: string; message?: string };
+            handlers.onStatus?.({
+                tool: parsed.tool,
+                message: parsed.message ?? 'Working on it…',
+            });
+        } catch {
+            handlers.onStatus?.({ message: data || 'Working on it…' });
+        }
+        return;
+    }
+
     if (eventName === 'done') {
         handlers.onDone(JSON.parse(data) as ChatResponse);
         return;
@@ -121,29 +135,49 @@ async function consumeSseStream(
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let receivedTerminalEvent = false;
 
-    while (true) {
-        if (signal?.aborted) {
-            await reader.cancel();
-            throw new DOMException('Stream aborted', 'AbortError');
-        }
+    const wrappedHandlers: StreamSendHandlers = {
+        onToken: handlers.onToken,
+        onStatus: handlers.onStatus,
+        onDone: (response) => {
+            receivedTerminalEvent = true;
+            handlers.onDone(response);
+        },
+        onError: (message) => {
+            receivedTerminalEvent = true;
+            handlers.onError(message);
+        },
+    };
 
-        const { done, value } = await reader.read();
-        if (done) break;
+    try {
+        while (true) {
+            if (signal?.aborted) {
+                await reader.cancel();
+                throw new DOMException('Stream aborted', 'AbortError');
+            }
 
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() ?? '';
+            const { done, value } = await reader.read();
+            if (done) break;
 
-        for (const eventBlock of events) {
-            if (eventBlock.trim()) {
-                parseSseEvent(eventBlock, handlers);
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop() ?? '';
+
+            for (const eventBlock of events) {
+                if (eventBlock.trim()) {
+                    parseSseEvent(eventBlock, wrappedHandlers);
+                }
             }
         }
-    }
 
-    if (buffer.trim()) {
-        parseSseEvent(buffer, handlers);
+        if (buffer.trim()) {
+            parseSseEvent(buffer, wrappedHandlers);
+        }
+    } finally {
+        if (!receivedTerminalEvent && !signal?.aborted) {
+            handlers.onError('The reply was interrupted. Please try again.');
+        }
     }
 }
 
@@ -176,5 +210,6 @@ export const chatApi = {
         await consumeSseStream(response.body, handlers, signal);
     },
     getHistory: () => api.get<{ messages: HistoryMessage[] }>('/api/chat/history'),
+    clearHistory: () => api.delete<{ cleared: boolean }>('/api/chat/history'),
     getActions: () => api.get<{ actions: string[]; description: string }>('/api/chat/actions'),
 };

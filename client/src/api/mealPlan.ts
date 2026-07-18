@@ -1,19 +1,27 @@
 import { api } from './client';
-import { MealPlan } from './types';
+import { ConfirmMealPlanResult, MealPlan } from './types';
 
 export const mealPlanApi = {
-    // List all meal plans, optionally filtered by query
-    list: (query?: string) => api.get<MealPlan[]>(query ? `/api/meal-plan?query=${encodeURIComponent(query)}` : '/api/meal-plan'),
+    list: (query?: string) =>
+        api.get<MealPlan[] | { mealPlans?: MealPlan[] }>(
+            query ? `/api/meal-plan?query=${encodeURIComponent(query)}` : '/api/meal-plan'
+        ),
 
-    // Get a single meal plan by ID
     get: (id: string | number) => api.get<MealPlan>(`/api/meal-plan/${id}`),
 
-    // Create a new meal plan
-    create: (data: Partial<MealPlan>) => api.post<MealPlan>('/api/meal-plan', data),
+    pendingConfirm: () =>
+        api.get<{ mealPlans?: MealPlan[] } | MealPlan[]>('/api/meal-plan/pending-confirm'),
 
-    // Update an existing meal plan by ID
-    update: (id: string | number, data: Partial<MealPlan>) => api.put<MealPlan>(`/api/meal-plan/${id}`, data),
+    create: (data: Partial<MealPlan>) => api.post<MealPlan | { mealPlan?: MealPlan }>('/api/meal-plan', data),
 
-    // Delete a meal plan by ID
+    confirm: (id: string | number) =>
+        api.post<ConfirmMealPlanResult>(`/api/meal-plan/${id}/confirm`),
+
+    skip: (id: string | number) =>
+        api.post<{ mealPlan: MealPlan; alreadySkipped: boolean }>(`/api/meal-plan/${id}/skip`),
+
+    update: (id: string | number, data: Partial<MealPlan>) =>
+        api.put<MealPlan>(`/api/meal-plan/${id}`, data),
+
     delete: (id: string | number) => api.delete<void>(`/api/meal-plan/${id}`),
 };

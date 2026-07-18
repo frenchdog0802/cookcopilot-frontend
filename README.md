@@ -1,10 +1,10 @@
-# Pantry App (CookPlanner) — Web Frontend
+# Pantry App (CookCopilot) — Web Frontend
 
 > **Note:** This file is partially outdated. For accurate stack and run instructions, use the repo root [README.md](../../README.md) and [PROJECT_STATUS.md](../../PROJECT_STATUS.md).
 
 ## Overview
 
-**CookPlanner** web client — React + Vite SPA that talks to the Spring Boot backend.
+**CookCopilot** web client — React + Vite SPA that talks to the Spring Boot backend.
 
 ## Quick run
 
@@ -26,13 +26,13 @@ client/
 │   ├── api/                 REST client modules
 │   ├── components/          UI screens
 │   └── contexts/            authContext, pantryContext
-├── design-system/cookplanner/MASTER.md
+├── design-system/cookcopilot/MASTER.md
 └── e2e/                     Playwright tests
 ```
 
 ## Design
 
-Warm Kitchen palette — see `client/design-system/cookplanner/MASTER.md` and `client/src/index.css`.
+Warm Kitchen palette — see `client/design-system/cookcopilot/MASTER.md` and `client/src/index.css`.
 
 ## Tests
 

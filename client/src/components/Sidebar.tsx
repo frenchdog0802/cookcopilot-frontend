@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   ChefHatIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface SidebarProps {
   activeView: string;
@@ -15,16 +16,18 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { pageId: 'home', icon: HomeIcon, label: 'Home' },
-  { pageId: 'aiAssistant', icon: BotMessageSquare, label: 'AI Chat' },
-  { pageId: 'calendar', icon: CalendarIcon, label: 'Calendar' },
-  { pageId: 'pantryInventory', icon: PackageIcon, label: 'Pantry' },
-  { pageId: 'shoppingList', icon: ShoppingCart, label: 'Shopping List' },
-  { pageId: 'recipeManager', icon: UtensilsIcon, label: 'Recipes' },
-  { pageId: 'settings', icon: SettingsIcon, label: 'Settings' },
-];
+  { pageId: 'home', icon: HomeIcon, labelKey: 'nav.home' },
+  { pageId: 'aiAssistant', icon: BotMessageSquare, labelKey: 'nav.aiChat' },
+  { pageId: 'calendar', icon: CalendarIcon, labelKey: 'nav.calendar' },
+  { pageId: 'pantryInventory', icon: PackageIcon, labelKey: 'nav.pantry' },
+  { pageId: 'shoppingList', icon: ShoppingCart, labelKey: 'nav.shoppingList' },
+  { pageId: 'recipeManager', icon: UtensilsIcon, labelKey: 'nav.recipes' },
+  { pageId: 'settings', icon: SettingsIcon, labelKey: 'nav.settings' },
+] as const;
 
 export function Sidebar({ activeView, onNavigate }: SidebarProps) {
+  const { t } = useTranslation();
+
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 bg-surface border-r border-line flex-col z-50">
       <div className="px-5 py-6 border-b border-line">
@@ -33,8 +36,8 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
             <ChefHatIcon size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="font-display text-lg font-semibold text-ink leading-tight">CookPlanner</h1>
-            <p className="text-[11px] text-muted leading-tight">Kitchen Planner</p>
+            <h1 className="font-display text-lg font-semibold text-ink leading-tight">CookCopilot</h1>
+            <p className="text-[11px] text-muted leading-tight">{t('nav.tagline')}</p>
           </div>
         </div>
       </div>
@@ -55,14 +58,14 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
                 }`}
             >
               <Icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </button>
           );
         })}
       </nav>
 
       <div className="px-4 py-3 border-t border-line">
-        <p className="text-[11px] text-muted text-center">&copy; 2026 CookPlanner</p>
+        <p className="text-[11px] text-muted text-center">&copy; 2026 CookCopilot</p>
       </div>
     </aside>
   );

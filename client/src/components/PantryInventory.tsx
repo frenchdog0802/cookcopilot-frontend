@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon, PlusIcon, MinusIcon, TrashIcon, SearchIcon, PackageIcon } from 'lucide-react';
 import { usePantry } from '../contexts/pantryContext';
 import { IngredientEntry, PantryItem } from '../api/types';
 import useSearchIngredients from '../hooks/useSearchIngredient';
 import { NumberInput } from './NumberInput';
+import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from './UnitSelect';
+import type { MeasurementSystem } from '../utils/units';
 
 interface PantryInventoryProps {
     onBack: () => void;
 }
 
 export function PantryInventory({ onBack }: PantryInventoryProps) {
+    const { t } = useTranslation();
     const {
         pantryItems: oriPantryItems,
         updatePantryItem,
@@ -17,8 +21,10 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
         removePantryItem,
         ingredients,
         fetchAllPantryItems,
+        userSettings,
     } = usePantry();
 
+    const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
     const [pantryItems, setPantryItems] = useState<PantryItem[]>(oriPantryItems);
     const [searchQuery, setSearchQuery] = useState('');
     const [newItem, setNewItem] = useState({
@@ -44,7 +50,7 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                 setNewItem(prev => ({
                     ...prev,
                     name: match.name,
-                    unit: match.default_unit || '',
+                    unit: preferredUnitForIngredient(match, measurementSystem).unit,
                 }));
                 setShowDropdown(false);
                 setSelectedIndex(-1);
@@ -59,10 +65,12 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
     // Filter pantry items based on search query
     const filteredItems = useMemo(() => {
         return pantryItems.filter(item => {
-            const isEnglish = /^[\x00-\x7F]*$/.test(item.name);
+            const name = item.name ?? '';
+            if (!name) return !searchQuery;
+            const isEnglish = /^[\x00-\x7F]*$/.test(name);
             const matchesSearch = isEnglish
-                ? item.name.toLowerCase().includes(searchQuery.toLowerCase())
-                : item.name.includes(searchQuery);
+                ? name.toLowerCase().includes(searchQuery.toLowerCase())
+                : name.includes(searchQuery);
             return matchesSearch;
         });
     }, [pantryItems, searchQuery]);
@@ -81,7 +89,7 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
         setNewItem({
             name: ingredient.name,
             quantity: 1,
-            unit: ingredient.default_unit || "",
+            unit: preferredUnitForIngredient(ingredient, measurementSystem).unit,
         });
         setShowDropdown(false);
         setSelectedIndex(-1);
@@ -134,56 +142,63 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
         setIsAddingItem(false);
     };
 
+    const needsBuyingCount = useMemo(
+        () => filteredItems.filter(item => (item.item_to_buy || 0) > 0).length,
+        [filteredItems]
+    );
+
     return (
         <div className="flex flex-col w-full min-h-screen bg-linen">
             <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
-                {/* Page title */}
-                <div className="max-w-6xl mx-auto px-6 lg:px-8 py-6 flex items-center gap-4">
-                    <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label="Go back">
+                <div className="max-w-3xl mx-auto px-6 lg:px-8 py-6 flex items-center gap-4">
+                    <button onClick={onBack} className="lg:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors" aria-label={t('common.back')}>
                         <ArrowLeftIcon size={22} />
                     </button>
-                    <h1 className="page-title animate-fade-in">Kitchen Inventory</h1>
+                    <div>
+                        <h1 className="page-title animate-fade-in">{t('pantry.title')}</h1>
+                        <p className="page-subtitle mt-1">
+                            {filteredItems.length} item{filteredItems.length === 1 ? '' : 's'}
+                            {needsBuyingCount > 0 ? ` · ${needsBuyingCount} to buy` : ''}
+                        </p>
+                    </div>
                 </div>
 
-                {/* Main Content */}
-                <main className="flex-1 max-w-6xl mx-auto w-full px-6 lg:px-8 py-6">
-                    {/* Search Bar */}
-                    <div className="relative mb-6">
+                <main className="flex-1 max-w-3xl mx-auto w-full px-6 lg:px-8 pb-6">
+                    <div className="relative mb-4">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <SearchIcon size={18} className="text-muted" />
                         </div>
                         <input
                             type="text"
-                            placeholder="Search ingredients..."
+                            placeholder={t('pantry.searchPlaceholder')}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="w-full pl-10 pr-4 py-3 rounded-xl border border-line focus:outline-none focus:ring-2 focus:ring-herb/30 focus:border-transparent"
                         />
                     </div>
 
-                    {/* Add New Item Button */}
                     {!isAddingItem ? (
                         <button
                             onClick={() => setIsAddingItem(true)}
-                            className="w-full flex items-center justify-center gap-2 bg-surface border border-line hover:bg-linen text-ink font-medium py-3 px-4 rounded-xl mb-6 shadow-sm transition-colors"
+                            className="w-full flex items-center justify-center gap-2 bg-surface border border-line hover:bg-linen text-ink font-medium py-3 px-4 rounded-xl mb-4 shadow-sm transition-colors"
                         >
                             <PlusIcon size={18} />
-                            <span>Add New Item</span>
+                            <span>{t('pantry.addItem')}</span>
                         </button>
                     ) : (
-                        <div className="bg-surface p-4 rounded-xl shadow-sm border border-line mb-6">
-                            <h3 className="font-medium text-ink mb-3">Add New Item</h3>
+                        <div className="bg-surface p-4 rounded-xl shadow-sm border border-line mb-4">
+                            <h3 className="font-medium text-ink mb-3">{t('pantry.addItem')}</h3>
 
                             <div className="space-y-3 relative">
                                 <input
                                     type="text"
-                                    placeholder="Search or add item name"
+                                    placeholder={t('pantry.itemNamePlaceholder')}
                                     value={newItem.name}
                                     onChange={(e) => {
                                         const newName = e.target.value;
                                         setNewItem({ ...newItem, name: newName });
                                         setShowDropdown(newName.length > 0);
-                                        setSelectedIndex(-1);  // ???????
+                                        setSelectedIndex(-1);
                                     }}
                                     onKeyDown={(e) => {
                                         if (!showDropdown || filteredPantryIngredients.length === 0) return;
@@ -203,7 +218,6 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                                     const selected = filteredPantryIngredients[selectedIndex];
                                                     handleSelectIngredient(selected);
                                                 } else if (filteredPantryIngredients.length === 1) {
-                                                    // Fallback to auto-select
                                                     handleSelectIngredient(filteredPantryIngredients[0]);
                                                 }
                                                 break;
@@ -214,13 +228,14 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                         }
                                     }}
                                     onBlur={() => {
+                                        // Delay close so option mousedown/click can fire first
                                         setTimeout(() => setShowDropdown(false), 200);
                                     }}
                                     className="w-full p-2 border border-line rounded-lg"
                                 />
 
                                 {showDropdown && (
-                                    <ul className="absolute z-10 w-full bg-surface border border-line rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
+                                    <ul className="absolute z-30 w-full bg-surface border border-line rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1">
                                         {pantryLoading ? (
                                             <li className="p-3 text-center text-muted text-sm flex items-center justify-center">
                                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-herb mr-2"></div>
@@ -229,7 +244,6 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                         ) : filteredPantryIngredients.length > 0 ? (
                                             filteredPantryIngredients.map((ingredient: IngredientEntry, index: number) => {
                                                 const isSelected = index === selectedIndex;
-                                                // ???????????????????
                                                 const query = newItem.name.toLowerCase();
                                                 const highlightedName = ingredient.name.replace(
                                                     new RegExp(`(${query})`, 'gi'),
@@ -238,9 +252,13 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                                 return (
                                                     <li key={ingredient.id} className={`p-3 ${isSelected ? 'bg-sage/50' : 'hover:bg-sage/50'}`}>
                                                         <button
-                                                            onClick={() => handleSelectIngredient(ingredient)}
+                                                            type="button"
+                                                            onMouseDown={e => {
+                                                                e.preventDefault();
+                                                                handleSelectIngredient(ingredient);
+                                                            }}
                                                             className={`w-full text-left ${isSelected ? 'font-medium' : ''}`}
-                                                            dangerouslySetInnerHTML={{ __html: highlightedName + ` <span class="text-sm text-muted">(${ingredient.default_unit})</span>` }}
+                                                            dangerouslySetInnerHTML={{ __html: highlightedName + ` <span class="text-sm text-muted">(${ingredient.default_display_unit || ingredient.default_unit || ''})</span>` }}
                                                         />
                                                     </li>
                                                 );
@@ -266,12 +284,18 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                                         }
                                         className="w-1/3 p-2 rounded-lg"
                                     />
-                                    <input
-                                        type="text"
-                                        placeholder="Unit (g, ml, etc.)"
+                                    <UnitSelect
+                                        kind={preferredUnitForIngredient(
+                                            ingredients.find(i => i.name.toLowerCase() === newItem.name.toLowerCase()) || {
+                                                default_unit: newItem.unit,
+                                            },
+                                            measurementSystem
+                                        ).kind}
                                         value={newItem.unit}
-                                        onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                                        className="w-2/3 p-2 border border-line rounded-lg"
+                                        onChange={unit => setNewItem({ ...newItem, unit })}
+                                        measurementSystem={measurementSystem}
+                                        preferSystemUnits
+                                        className="w-2/3 p-2 border border-line rounded-lg bg-surface"
                                     />
                                 </div>
 
@@ -287,94 +311,87 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                         </div>
                     )}
 
-                    {/* Legend */}
-                    <div className="bg-surface rounded-xl p-3 mb-4 shadow-sm border border-line">
-                        <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-sage/500"></div>
-                                <span className="text-muted font-medium">Planned</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-sage/500"></div>
-                                <span className="text-muted font-medium">To Buy</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-sage/500"></div>
-                                <span className="text-muted font-medium">Pantry</span>
-                            </div>
+                    {filteredItems.length === 0 ? (
+                        <div className="bg-surface rounded-xl p-10 text-center shadow-sm border border-line">
+                            <PackageIcon size={40} className="mx-auto mb-3 text-muted/40" />
+                            <p className="text-ink font-medium">{t('pantry.empty')}</p>
+                            {searchQuery && (
+                                <p className="text-muted text-sm mt-1">{t('common.tryDifferentSearch')}</p>
+                            )}
                         </div>
-                    </div>
+                    ) : (
+                        <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden divide-y divide-line">
+                            {filteredItems.map(item => {
+                                const planned = item.item_planned || 0;
+                                const toBuy = item.item_to_buy || 0;
+                                const isOut = (item.quantity || 0) <= 0;
 
-                    {/* Pantry Items List */}
-                    <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-4 lg:gap-3 lg:space-y-0 lg:auto-rows-fr">
-                        {filteredItems.length === 0 ? (
-                            <div className="bg-surface rounded-xl p-6 text-center shadow-sm border border-line">
-                                <PackageIcon size={32} className="mx-auto mb-2 text-muted/40" />
-                                <p className="text-muted text-sm">No items found</p>
-                                {searchQuery && (
-                                    <p className="text-muted text-xs mt-1">Try a different search term</p>
-                                )}
-                            </div>
-                        ) : (
-                            filteredItems.map(item => (
-                                <div key={item.name} className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden flex flex-col">
-                                    {/* Item Header */}
-                                    <div className="p-3 pb-2 flex-1 flex flex-col">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="font-semibold text-ink capitalize truncate text-sm">{item.name}</h3>
-                                                <p className="text-[11px] text-muted mt-0.5">{item.unit}</p>
+                                return (
+                                    <div
+                                        key={item.id || item.name}
+                                        className={`flex items-center gap-3 px-4 py-3.5 ${isOut ? 'bg-amber-50/40' : ''}`}
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-baseline gap-2">
+                                                <h3 className="text-base font-semibold text-ink truncate">{item.name}</h3>
                                             </div>
-                                            <button
-                                                onClick={() => handleRemoveItem(item.name)}
-                                                className="p-1.5 rounded-lg hover:bg-sage/50 active:bg-sage text-muted hover:text-herb transition-colors -mr-1"
-                                                aria-label="Remove item"
-                                            >
-                                                <TrashIcon size={14} />
-                                            </button>
+                                            {(planned > 0 || toBuy > 0) && (
+                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm">
+                                                    {planned > 0 && (
+                                                        <span className="text-muted">
+                                                            Planned <span className="font-semibold text-ink">{planned}</span>
+                                                        </span>
+                                                    )}
+                                                    {toBuy > 0 && (
+                                                        <span className="text-amber-800">
+                                                            To buy <span className="font-semibold">{toBuy}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* Status Grid */}
-                                        <div className="grid grid-cols-3 gap-1.5 mb-2">
-                                            <div className="bg-sage/50 rounded-md p-1.5 text-center border border-blue-100">
-                                                <span className="text-[10px] font-medium text-herb block mb-0.5">Planned</span>
-                                                <span className="text-sm font-bold text-blue-900">{item.item_planned || 0}</span>
-                                            </div>
-                                            <div className="bg-sage/50 rounded-md p-1.5 text-center border border-amber-100">
-                                                <span className="text-[10px] font-medium text-muted block mb-0.5">To Buy</span>
-                                                <span className="text-sm font-bold text-amber-900">{item.item_to_buy || 0}</span>
-                                            </div>
-                                            <div className="bg-sage/50 rounded-md p-1.5 text-center border border-line">
-                                                <span className="text-[10px] font-medium text-herb block mb-0.5">Pantry</span>
-                                                <span className="text-sm font-bold text-green-900">{item.quantity || 0}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Quantity Controls */}
-                                        <div className="flex items-center justify-center gap-3 pt-2 mt-auto border-t border-line">
+                                        <div className="flex items-center gap-1.5 shrink-0">
                                             <button
                                                 onClick={() => handleUpdateQuantity(item.name, -0.5)}
-                                                className="p-2 rounded-lg bg-sage/40 hover:bg-sage/60 active:bg-sage transition-colors"
-                                                aria-label="Decrease quantity"
+                                                className="w-9 h-9 flex items-center justify-center rounded-lg bg-sage/50 hover:bg-sage text-ink transition-colors"
+                                                aria-label={`Decrease ${item.name}`}
                                             >
-                                                <MinusIcon size={16} className="text-ink" />
+                                                <MinusIcon size={16} />
                                             </button>
-                                            <div className="text-center min-w-[40px]">
-                                                <div className="text-lg font-bold text-ink leading-none">{item.quantity}</div>
+                                            <div className="min-w-[3.25rem] text-center">
+                                                <span className={`text-lg font-bold tabular-nums leading-none ${isOut ? 'text-amber-800' : 'text-ink'}`}>
+                                                    <QuantityLabel
+                                                        quantity={item.quantity}
+                                                        unit={item.unit}
+                                                        unitKind={item.unit_kind}
+                                                        baseUnit={item.base_unit}
+                                                        defaultDisplayUnit={item.default_display_unit}
+                                                        measurementSystem={measurementSystem}
+                                                    />
+                                                </span>
                                             </div>
                                             <button
                                                 onClick={() => handleUpdateQuantity(item.name, 0.5)}
-                                                className="p-2 rounded-lg bg-herb hover:bg-herb active:bg-herb-deep transition-colors"
-                                                aria-label="Increase quantity"
+                                                className="w-9 h-9 flex items-center justify-center rounded-lg bg-herb hover:bg-herb-deep text-white transition-colors"
+                                                aria-label={`Increase ${item.name}`}
                                             >
-                                                <PlusIcon size={16} className="text-white" />
+                                                <PlusIcon size={16} />
                                             </button>
                                         </div>
+
+                                        <button
+                                            onClick={() => handleRemoveItem(item.name)}
+                                            className="p-2 rounded-lg text-muted hover:text-herb hover:bg-sage/50 transition-colors shrink-0"
+                                            aria-label={`Remove ${item.name}`}
+                                        >
+                                            <TrashIcon size={16} />
+                                        </button>
                                     </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </main>
             </div>
         </div>

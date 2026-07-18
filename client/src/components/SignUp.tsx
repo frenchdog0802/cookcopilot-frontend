@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChefHatIcon } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/authContext';
@@ -11,6 +12,7 @@ interface SignUpProps {
 }
 
 export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
+  const { t } = useTranslation();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,7 +26,7 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordsMismatch'));
       return;
     }
 
@@ -34,10 +36,10 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
       if (response.success) {
         onSignUpSuccess();
       } else {
-        setError(response.message || 'Sign up failed');
+        setError(response.message || t('auth.signUpFailed'));
       }
     } catch {
-      setError('An error occurred. Please try again.');
+      setError(t('auth.genericError'));
     }
   };
 
@@ -49,14 +51,14 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
         if (result.success) {
           onSignUpSuccess();
         } else {
-          setError(result.message || 'Google sign up failed');
+          setError(result.message || t('auth.googleSignUpFailed'));
         }
       } catch {
-        setError('Google sign up failed. Please try again.');
+        setError(t('auth.googleSignUpRetry'));
       }
     },
     onError: () => {
-      setError('Google sign up was cancelled or failed.');
+      setError(t('auth.googleSignUpCancelled'));
     },
   });
 
@@ -69,8 +71,8 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-herb mb-4">
                 <ChefHatIcon size={24} className="text-white" />
               </div>
-              <h1 className="font-display text-4xl font-semibold text-ink">CookPlanner</h1>
-              <p className="text-muted mt-2">Create your account</p>
+              <h1 className="font-display text-4xl font-semibold text-ink">CookCopilot</h1>
+              <p className="text-muted mt-2">{t('auth.signUpTitle')}</p>
             </div>
 
             {loading ? (
@@ -86,7 +88,7 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label htmlFor="firstName" className="block text-sm font-medium text-ink mb-1">
-                        First Name
+                        {t('auth.firstName')}
                       </label>
                       <input
                         id="firstName"
@@ -100,7 +102,7 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
                     </div>
                     <div>
                       <label htmlFor="lastName" className="block text-sm font-medium text-ink mb-1">
-                        Last Name
+                        {t('auth.lastName')}
                       </label>
                       <input
                         id="lastName"
@@ -115,7 +117,7 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
                   </div>
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-ink mb-1">
-                      Email
+                      {t('auth.email')}
                     </label>
                     <input
                       id="email"
@@ -129,7 +131,7 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
                   </div>
                   <div>
                     <label htmlFor="password" className="block text-sm font-medium text-ink mb-1">
-                      Password
+                      {t('auth.password')}
                     </label>
                     <input
                       id="password"
@@ -137,13 +139,13 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                       className="input-field"
-                      placeholder="Password"
+                      placeholder={t('auth.passwordPlaceholder')}
                       required
                     />
                   </div>
                   <div>
                     <label htmlFor="confirmPassword" className="block text-sm font-medium text-ink mb-1">
-                      Confirm Password
+                      {t('auth.confirmPassword')}
                     </label>
                     <input
                       id="confirmPassword"
@@ -151,12 +153,12 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
                       value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
                       className="input-field"
-                      placeholder="Password"
+                      placeholder={t('auth.passwordPlaceholder')}
                       required
                     />
                   </div>
                   <button type="submit" className="btn-primary w-full">
-                    Sign up
+                    {t('auth.signUp')}
                   </button>
                 </form>
 
@@ -165,7 +167,7 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
                     <div className="w-full border-t border-line" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-3 bg-linen text-muted">or</span>
+                    <span className="px-3 bg-linen text-muted">{t('common.or')}</span>
                   </div>
                 </div>
 
@@ -183,14 +185,14 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
                         <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
                       </g>
                     </svg>
-                    Sign up with Google
+                    {t('auth.signUpGoogle')}
                   </button>
                 </div>
 
                 <div className="text-center text-sm text-muted mt-8">
-                  Already have an account?{' '}
+                  {t('auth.haveAccount')}{' '}
                   <button onClick={onLogin} className="text-herb hover:text-herb-deep font-medium">
-                    Log in
+                    {t('auth.logIn')}
                   </button>
                 </div>
               </>
