@@ -11,6 +11,9 @@ interface AuthContextType {
   user: User | null;
   /** True only while restoring session from storage on app boot. */
   initializing: boolean;
+  /** Set when mobile Google redirect callback fails. */
+  redirectError: string | null;
+  clearRedirectError: () => void;
   signUp: (user: User, password: string) => Promise<AuthResponse>;
   login: (email: string, password: string) => Promise<AuthResponse>;
   googleLogin: (googleAccessToken: string) => Promise<AuthResponse>;
@@ -18,6 +21,40 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function decodeBase64UrlJson<T>(encoded: string): T {
+  const padded = encoded + '='.repeat((4 - (encoded.length % 4)) % 4);
+  const b64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+  const json = atob(b64);
+  return JSON.parse(json) as T;
+}
+
+/** Complete Google redirect login when returning from /api/auth/google-callback. */
+function consumeGoogleRedirectAuth(): { user: User; token: string } | { error: string } | null {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash || '';
+  if (hash.startsWith('#google_auth_error=')) {
+    const msg = decodeURIComponent(hash.slice('#google_auth_error='.length));
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    return { error: msg || 'Google login failed' };
+  }
+  if (!hash.startsWith('#google_auth=')) return null;
+
+  try {
+    const encoded = hash.slice('#google_auth='.length);
+    const payload = decodeBase64UrlJson<{ token: string; user: User }>(encoded);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (!payload?.token || !payload?.user) {
+      return { error: 'Google login failed' };
+    }
+    return { token: payload.token, user: payload.user };
+  } catch (e) {
+    console.error('Failed to parse Google redirect payload', e);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    return { error: 'Google login failed' };
+  }
+}
+
 export const AuthProvider: React.FC<{
   children: React.ReactNode;
 }> = ({
@@ -25,10 +62,22 @@ export const AuthProvider: React.FC<{
 }) => {
     const [user, setUser] = useState<User | null>(null);
     const [initializing, setInitializing] = useState(true);
+    const [redirectError, setRedirectError] = useState<string | null>(null);
 
     useEffect(() => {
       const checkAuth = () => {
         try {
+          const redirected = consumeGoogleRedirectAuth();
+          if (redirected && 'error' in redirected) {
+            setRedirectError(redirected.error);
+          } else if (redirected && 'token' in redirected) {
+            authHelper.authenticate(redirected.token);
+            setUser(redirected.user);
+            localStorage.setItem('user', JSON.stringify(redirected.user));
+            setInitializing(false);
+            return;
+          }
+
           const storedUser = localStorage.getItem('user');
           const jwttoken = authHelper.getJWT();
           if (storedUser && jwttoken) {
@@ -121,6 +170,8 @@ export const AuthProvider: React.FC<{
     const value = {
       user,
       initializing,
+      redirectError,
+      clearRedirectError: () => setRedirectError(null),
       login,
       googleLogin,
       logout,

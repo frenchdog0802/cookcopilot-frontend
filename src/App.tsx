@@ -24,11 +24,17 @@ function AppContent() {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const {
     isAuthenticated,
-    initializing
+    initializing,
+    redirectError,
   } = useAuth();
 
   useEffect(() => {
     if (initializing) return;
+
+    if (redirectError) {
+      setCurrentView('login');
+      return;
+    }
 
     if (!isAuthenticated) {
       setCurrentView((prev) => (GUEST_VIEWS.has(prev) ? prev : 'landing'));
@@ -38,7 +44,7 @@ function AppContent() {
     setCurrentView((prev) =>
       prev === 'landing' || prev === 'login' || prev === 'signup' ? 'aiAssistant' : prev,
     );
-  }, [isAuthenticated, initializing]);
+  }, [isAuthenticated, initializing, redirectError]);
 
   const handleNavigate = (view: string,) => {
     setCurrentView(view);
