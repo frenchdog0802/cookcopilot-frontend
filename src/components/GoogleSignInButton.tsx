@@ -1,11 +1,6 @@
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
-function isMobileBrowser(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
-/** Backend URL Google should POST the ID token to (redirect UX on mobile). */
+/** Backend URL Google POSTs the ID token to (redirect UX). */
 export function googleCallbackUri(): string {
   const configured = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '');
   const base = configured && configured.length > 0 ? configured : window.location.origin;
@@ -19,17 +14,16 @@ type GoogleSignInButtonProps = {
 };
 
 /**
- * Desktop: popup (onSuccess).
- * Mobile: redirect — Google posts to backend, which bounces back to /#google_auth=...
+ * Always use redirect UX. Popup breaks on many mobile browsers (blank Google page).
+ * Google posts the ID token to the backend; backend redirects to /#google_auth=...
+ * onSuccess is only a fallback if GIS still delivers a credential in-page.
  */
 export function GoogleSignInButton({ text = 'signin_with', onCredential, onError }: GoogleSignInButtonProps) {
-  const useRedirect = isMobileBrowser();
-
   return (
     <div className="flex justify-center w-full">
       <GoogleLogin
-        ux_mode={useRedirect ? 'redirect' : 'popup'}
-        login_uri={useRedirect ? googleCallbackUri() : undefined}
+        ux_mode="redirect"
+        login_uri={googleCallbackUri()}
         onSuccess={onCredential}
         onError={onError}
         theme="outline"
