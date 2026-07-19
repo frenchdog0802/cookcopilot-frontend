@@ -15,7 +15,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<ApiR
 
     const headers = new Headers(options.headers);
     if (options.body !== undefined && !headers.has('Content-Type')) {
-        headers.set('Content-Type', 'application/json');
+        headers.set('Content-Type', 'application/json; charset=UTF-8');
+    }
+    if (!headers.has('Accept')) {
+        headers.set('Accept', 'application/json');
     }
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);

@@ -22,10 +22,13 @@ interface AuthContextType {
 }
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Decode Base64URL JSON that was UTF-8 encoded (atob alone mangles Chinese). */
 function decodeBase64UrlJson<T>(encoded: string): T {
   const padded = encoded + '='.repeat((4 - (encoded.length % 4)) % 4);
   const b64 = padded.replace(/-/g, '+').replace(/_/g, '/');
-  const json = atob(b64);
+  const binary = atob(b64);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const json = new TextDecoder('utf-8').decode(bytes);
   return JSON.parse(json) as T;
 }
 
