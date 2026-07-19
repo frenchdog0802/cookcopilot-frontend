@@ -1,6 +1,5 @@
 ﻿import React, { useState } from 'react';
 import { ChefHatIcon } from 'lucide-react';
-import { type CredentialResponse } from '@react-oauth/google';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/authContext';
 import { Loading } from './Loading';
@@ -17,7 +16,7 @@ export function Login({ onSignUp, onLoginSuccess }: LoginProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login, googleLogin, isAuthenticated, redirectError, clearRedirectError } = useAuth();
+  const { login, isAuthenticated, redirectError, clearRedirectError } = useAuth();
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -45,27 +44,6 @@ export function Login({ onSignUp, onLoginSuccess }: LoginProps) {
       }
     } catch {
       setError(t('auth.genericError'));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleGoogleCredential = async (response: CredentialResponse) => {
-    if (!response.credential) {
-      setError(t('auth.googleFailed'));
-      return;
-    }
-    setError('');
-    setIsSubmitting(true);
-    try {
-      const result = await googleLogin(response.credential);
-      if (result.success) {
-        onLoginSuccess();
-      } else {
-        setError(result.message || t('auth.googleFailed'));
-      }
-    } catch {
-      setError(t('auth.googleRetry'));
     } finally {
       setIsSubmitting(false);
     }
@@ -154,7 +132,6 @@ export function Login({ onSignUp, onLoginSuccess }: LoginProps) {
 
                 <GoogleSignInButton
                   text="signin_with"
-                  onCredential={handleGoogleCredential}
                   onError={() => setError(t('auth.googleCancelled'))}
                 />
 

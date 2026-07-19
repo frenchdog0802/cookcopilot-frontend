@@ -1,7 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChefHatIcon } from 'lucide-react';
-import { type CredentialResponse } from '@react-oauth/google';
 import { useAuth } from '../contexts/authContext';
 import { Loading } from './Loading';
 import { GoogleSignInButton } from './GoogleSignInButton';
@@ -21,7 +20,14 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { signUp, googleLogin } = useAuth();
+  const { signUp, redirectError, clearRedirectError } = useAuth();
+
+  React.useEffect(() => {
+    if (redirectError) {
+      setError(redirectError);
+      clearRedirectError();
+    }
+  }, [redirectError, clearRedirectError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,27 +49,6 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
       }
     } catch {
       setError(t('auth.genericError'));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleGoogleCredential = async (response: CredentialResponse) => {
-    if (!response.credential) {
-      setError(t('auth.googleSignUpFailed'));
-      return;
-    }
-    setError('');
-    setIsSubmitting(true);
-    try {
-      const result = await googleLogin(response.credential);
-      if (result.success) {
-        onSignUpSuccess();
-      } else {
-        setError(result.message || t('auth.googleSignUpFailed'));
-      }
-    } catch {
-      setError(t('auth.googleSignUpRetry'));
     } finally {
       setIsSubmitting(false);
     }
@@ -180,7 +165,6 @@ export function SignUp({ onSignUpSuccess, onLogin }: SignUpProps) {
 
                 <GoogleSignInButton
                   text="signup_with"
-                  onCredential={handleGoogleCredential}
                   onError={() => setError(t('auth.googleSignUpCancelled'))}
                 />
 

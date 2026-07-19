@@ -1,4 +1,5 @@
-import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import { useEffect, useRef } from 'react';
+import { useGoogleOAuth } from '@react-oauth/google';
 
 /** Backend URL Google POSTs the ID token to (redirect UX). */
 export function googleCallbackUri(): string {
@@ -9,29 +10,64 @@ export function googleCallbackUri(): string {
 
 type GoogleSignInButtonProps = {
   text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
-  onCredential: (response: CredentialResponse) => void;
-  onError: () => void;
+  /** Unused for redirect UX; kept so Login/SignUp call sites stay simple. */
+  onCredential?: unknown;
+  onError?: () => void;
 };
 
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: Record<string, unknown>) => void;
+          renderButton: (parent: HTMLElement, config: Record<string, unknown>) => void;
+        };
+      };
+    };
+  }
+}
+
 /**
- * Always use redirect UX. Popup breaks on many mobile browsers (blank Google page).
- * Google posts the ID token to the backend; backend redirects to /#google_auth=...
- * onSuccess is only a fallback if GIS still delivers a credential in-page.
+ * Sign in with Google via full-page redirect.
+ *
+ * Important: @react-oauth/google's <GoogleLogin> always registers a JS `callback`,
+ * and Google docs say callback wins over login_uri — so redirect never runs and
+ * mobile often breaks. We initialize GIS ourselves without a callback.
  */
-export function GoogleSignInButton({ text = 'signin_with', onCredential, onError }: GoogleSignInButtonProps) {
-  return (
-    <div className="flex justify-center w-full">
-      <GoogleLogin
-        ux_mode="redirect"
-        login_uri={googleCallbackUri()}
-        onSuccess={onCredential}
-        onError={onError}
-        theme="outline"
-        size="large"
-        width="384"
-        text={text}
-        shape="rectangular"
-      />
-    </div>
-  );
+export function GoogleSignInButton({ text = 'signin_with', onError }: GoogleSignInButtonProps) {
+  const btnRef = useRef<HTMLDivElement>(null);
+  const { clientId, scriptLoadedSuccessfully } = useGoogleOAuth();
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  useEffect(() => {
+    if (!scriptLoadedSuccessfully || !clientId || !btnRef.current) return;
+    if (!window.google?.accounts?.id) {
+      onErrorRef.current?.();
+      return;
+    }
+
+    try {
+      // No `callback` here — required for login_uri redirect to be used.
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        ux_mode: 'redirect',
+        login_uri: googleCallbackUri(),
+      });
+      window.google.accounts.id.renderButton(btnRef.current, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        text,
+        shape: 'rectangular',
+        width: 384,
+      });
+    } catch (e) {
+      console.error('Failed to render Google button', e);
+      onErrorRef.current?.();
+    }
+  }, [scriptLoadedSuccessfully, clientId, text]);
+
+  return <div ref={btnRef} className="flex justify-center w-full min-h-10" />;
 }
