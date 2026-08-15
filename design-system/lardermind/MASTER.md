@@ -8,8 +8,8 @@
 
 **Project:** LarderMind  
 **Mood:** Warm kitchen — cozy, calm, food-at-home (not terracotta cliché, not dark dashboard)  
-**Surfaces aligned:** Web app + landing page  
-**Not yet aligned:** Mobile app (`mobile`)
+**Surfaces aligned:** Web app + landing page + Mobile app (`mobile`)  
+**Not yet aligned:** _(none)_
 
 ---
 
