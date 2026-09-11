@@ -5,12 +5,15 @@ import { usePantry, normalizeRecipe } from '../contexts/pantryContext';
 import { MealPlan, Recipe } from '../api/types';
 import { recipeApi } from '../api/recipes';
 import { Loading } from './Loading';
+import { AskAiEmptyCta } from './AskAiEmptyCta';
 import { dateLocale } from '../i18n';
 interface CalendarProps {
   onBack: () => void;
+  onAskAi?: (prompt: string) => void;
 }
 export function Calendar({
-  onBack
+  onBack,
+  onAskAi,
 }: CalendarProps) {
   const { t, i18n } = useTranslation();
   const {
@@ -780,9 +783,17 @@ export function Calendar({
             <p className="text-muted">
               {t('calendar.noMealsForDate')}
             </p>
-            <p className="text-muted text-sm mt-1">
-              Cook something delicious today!
-            </p>
+            {onAskAi ? (
+              <AskAiEmptyCta
+                hint={t('ai.emptyHint')}
+                label={t('ai.emptyCta.calendar')}
+                onClick={() => onAskAi(t('ai.emptyPrompts.calendar'))}
+              />
+            ) : (
+              <p className="text-muted text-sm mt-1">
+                Cook something delicious today!
+              </p>
+            )}
           </div>}
         </div>}
       </main>

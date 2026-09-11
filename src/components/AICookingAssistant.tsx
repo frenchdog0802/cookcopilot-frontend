@@ -2,7 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon, SendIcon, RefreshCwIcon, ShoppingCartIcon, ChevronRightIcon, XIcon, PlusCircleIcon } from 'lucide-react';
 import { usePantry } from '../contexts/pantryContext';
-import { chatApi, ChatResponse, HistoryMessage } from '../api/chat';
+import { chatApi, ChatResponse, ChatSession, HistoryMessage, PendingToolSummary } from '../api/chat';
 import { mealPlanApi } from '../api/mealPlan';
 import { RecipeSuggestion } from '../api/types';
 import ChatMessageContent from './ChatMessageContent';
@@ -10,6 +10,9 @@ import ChatMessageContent from './ChatMessageContent';
 interface AICookingAssistantProps {
   /** When false, the view is hidden but stays mounted so streams keep running. */
   isActive?: boolean;
+  /** Prefill the composer when navigating from an empty-state CTA. */
+  pendingPrompt?: string | null;
+  onPendingPromptConsumed?: () => void;
   onBack: () => void;
   onViewRecipe?: (recipeId: string) => void;
   onViewShoppingList?: () => void;
@@ -29,6 +32,7 @@ type MessageType =
   | 'meal_suggestions'
   | 'multi_action'
   | 'action_result'
+  | 'interrupt'
   | 'system'
   | 'confirmation'
   | 'error';
@@ -71,17 +75,10 @@ interface Message {
   statusText?: string;
 }
 
-function buildWelcomeMessage(content: string): Message {
-  return {
-    id: 'welcome',
-    role: 'assistant',
-    content,
-    timestamp: Date.now(),
-  };
-}
-
 export function AICookingAssistant({
   isActive = true,
+  pendingPrompt = null,
+  onPendingPromptConsumed,
   onBack,
   onViewRecipe,
   onViewShoppingList,
@@ -96,14 +93,18 @@ export function AICookingAssistant({
     fetchAllPantryItems,
     fetchAllMealPlans,
   } = usePantry();
-  const [messages, setMessages] = useState<Message[]>(() => [
-    buildWelcomeMessage(t('ai.welcome')),
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [suggestedRecipes, setSuggestedRecipes] = useState<RecipeSuggestion[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeSuggestion | null>(null);
   const [addingToMenuRecipeId, setAddingToMenuRecipeId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<{
+    sessionId: string;
+    pendingTools: PendingToolSummary[];
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -111,16 +112,6 @@ export function AICookingAssistant({
     const prompts = t('ai.suggestedPrompts', { returnObjects: true });
     return Array.isArray(prompts) ? (prompts as string[]) : [];
   }, [t, i18n.language]);
-
-  // Keep the greeting in sync with UI language while the chat is still at welcome-only.
-  useEffect(() => {
-    setMessages((prev) => {
-      if (prev.length === 1 && prev[0].id === 'welcome') {
-        return [buildWelcomeMessage(t('ai.welcome'))];
-      }
-      return prev;
-    });
-  }, [i18n.language, t]);
 
   // Auto-grow composer; beyond the cap the field scrolls so typed text stays visible.
   const COMPOSER_MAX_HEIGHT_PX = 240;
@@ -130,27 +121,70 @@ export function AICookingAssistant({
     el.style.height = '0px';
     el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT_PX)}px`;
   }, [inputValue]);
-  // Load chat history on mount
+  // Load sessions + history on mount
   useEffect(() => {
-    const loadHistory = async () => {
+    const bootstrap = async () => {
       try {
-        const response = await chatApi.getHistory();
-        if (response.success && response.data?.messages?.length) {
-          const historyMessages = response.data.messages.map((entry: HistoryMessage) => ({
-            id: entry.id,
-            role: entry.role,
-            content: entry.content.replace(/^\[Pantry context:[^\]]*\]\s*/i, '').trim() || entry.content,
-            timestamp: entry.createdAt * 1000,
-          }));
-          setMessages(historyMessages);
+        const sessionsRes = await chatApi.listSessions();
+        const list = sessionsRes.data?.sessions ?? [];
+        setSessions(list);
+        const initialId =
+          list.find((s) => s.isDefault)?.id ?? list[0]?.id ?? null;
+        setActiveSessionId(initialId);
+        if (initialId) {
+          await loadHistoryForSession(initialId);
         }
       } catch (error) {
-        console.error('Failed to load chat history', error);
+        console.error('Failed to load chat sessions', error);
+        try {
+          const response = await chatApi.getHistory();
+          if (response.success && response.data?.messages?.length) {
+            setActiveSessionId(response.data.sessionId ?? null);
+            setMessages(mapHistory(response.data.messages));
+          }
+        } catch (historyError) {
+          console.error('Failed to load chat history', historyError);
+        }
       }
     };
 
-    loadHistory();
+    void bootstrap();
   }, []);
+
+  const mapHistory = (entries: HistoryMessage[]): Message[] =>
+    entries.map((entry) => {
+      const type = (entry.responseType as MessageType | undefined) ?? undefined;
+      const cardTypes: MessageType[] = [
+        'recipe_created', 'recipe_imported', 'recipe_updated',
+        'shopping_list_updated', 'meal_plan_updated', 'pantry_updated',
+        'preferences_updated', 'meal_suggestions', 'multi_action', 'action_result',
+      ];
+      return {
+        id: entry.id,
+        role: entry.role,
+        content: entry.content.replace(/^\[Pantry context:[^\]]*\]\s*/i, '').trim() || entry.content,
+        timestamp: entry.createdAt * 1000,
+        type,
+        cardData:
+          type && cardTypes.includes(type) && entry.cardData
+            ? (entry.cardData as ResponseCardData)
+            : undefined,
+      };
+    });
+
+  const loadHistoryForSession = async (sessionId: string) => {
+    const response = await chatApi.getHistory(sessionId);
+    if (response.success && response.data?.messages?.length) {
+      setMessages(mapHistory(response.data.messages));
+    } else {
+      setMessages([]);
+    }
+  };
+
+  const refreshSessions = async () => {
+    const sessionsRes = await chatApi.listSessions();
+    setSessions(sessionsRes.data?.sessions ?? []);
+  };
 
   // Scroll to bottom of messages (only while the chat tab is visible)
   useEffect(() => {
@@ -164,6 +198,14 @@ export function AICookingAssistant({
     if (!isActive) return;
     inputRef.current?.focus();
   }, [isActive]);
+
+  // Prefill composer from empty-state / Home CTAs
+  useEffect(() => {
+    if (!isActive || !pendingPrompt) return;
+    setInputValue(pendingPrompt);
+    onPendingPromptConsumed?.();
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [isActive, pendingPrompt, onPendingPromptConsumed]);
   const mapResponseToMessage = (response: ChatResponse): Message => {
     const cardTypes: MessageType[] = [
       'recipe_created', 'recipe_imported', 'recipe_updated',
@@ -308,6 +350,7 @@ export function AICookingAssistant({
 
     setMessages(prev => [...prev, streamingMessage]);
     setIsTyping(true);
+    setPendingApproval(null);
     let settled = false;
 
     const settleStreaming = (updater: (message: Message) => Message) => {
@@ -319,7 +362,7 @@ export function AICookingAssistant({
 
     try {
       await chatApi.streamSend(
-        { message: userInput },
+        { message: userInput, sessionId: activeSessionId ?? undefined },
         {
           onToken: (token) => {
             setMessages(prev => prev.map(message =>
@@ -335,7 +378,38 @@ export function AICookingAssistant({
                 : message
             ));
           },
+          onInterrupt: (response) => {
+            const tools = (response.data?.pendingTools as PendingToolSummary[] | undefined) ?? [];
+            const sessionId =
+              (response.data?.sessionId as string | undefined) ??
+              activeSessionId ??
+              '';
+            setPendingApproval({ sessionId, pendingTools: tools });
+            settleStreaming((message) => ({
+              ...message,
+              type: 'interrupt',
+              content: response.message || 'Approval required before applying changes.',
+              streaming: false,
+              statusText: undefined,
+            }));
+          },
           onDone: async (response) => {
+            if (response.type === 'interrupt') {
+              const tools = (response.data?.pendingTools as PendingToolSummary[] | undefined) ?? [];
+              const sessionId =
+                (response.data?.sessionId as string | undefined) ??
+                activeSessionId ??
+                '';
+              setPendingApproval({ sessionId, pendingTools: tools });
+              settleStreaming((message) => ({
+                ...message,
+                type: 'interrupt',
+                content: response.message || 'Approval required before applying changes.',
+                streaming: false,
+                statusText: undefined,
+              }));
+              return;
+            }
             const finalized = mapResponseToMessage(response);
             settleStreaming((message) => ({
               ...finalized,
@@ -381,6 +455,60 @@ export function AICookingAssistant({
       }
     }
   };
+
+  const handleResume = async (decision: 'approve' | 'reject') => {
+    if (!pendingApproval) return;
+    setIsTyping(true);
+    try {
+      const response = await chatApi.resume({
+        sessionId: pendingApproval.sessionId,
+        decision,
+      });
+      setPendingApproval(null);
+      if (response.success && response.data) {
+        const finalized = mapResponseToMessage(response.data);
+        setMessages((prev) => [...prev, finalized]);
+        if (finalized.type && finalized.type !== 'text' && finalized.type !== 'error' && finalized.type !== 'interrupt') {
+          await refreshAfterAgentAction(finalized.type);
+        }
+        if (response.data.type === 'interrupt') {
+          const tools = (response.data.data?.pendingTools as PendingToolSummary[] | undefined) ?? [];
+          setPendingApproval({
+            sessionId: pendingApproval.sessionId,
+            pendingTools: tools,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Chat resume failed', error);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleSwitchSession = async (sessionId: string) => {
+    if (sessionId === activeSessionId || isTyping) return;
+    setActiveSessionId(sessionId);
+    setPendingApproval(null);
+    await loadHistoryForSession(sessionId);
+  };
+
+  const handleNewSession = async () => {
+    try {
+      const created = await chatApi.createSession();
+      if (created.success && created.data) {
+        await refreshSessions();
+        setActiveSessionId(created.data.id);
+        setPendingApproval(null);
+        setMessages([]);
+        setSuggestedRecipes([]);
+        setSelectedRecipe(null);
+        setInputValue('');
+      }
+    } catch (error) {
+      console.error('Failed to create chat session', error);
+    }
+  };
   // Handle sending a message
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
@@ -396,14 +524,15 @@ export function AICookingAssistant({
     // Generate response
     generateResponse(inputValue);
   };
-  // Handle clearing the chat (UI + server history + AI memory)
+  // Handle clearing the chat (UI + server history for active session)
   const handleClearChat = async () => {
     try {
-      await chatApi.clearHistory();
+      await chatApi.clearHistory(activeSessionId ?? undefined);
     } catch (error) {
       console.error('Failed to clear chat history', error);
     }
-    setMessages([buildWelcomeMessage(t('ai.welcome'))]);
+    setPendingApproval(null);
+    setMessages([]);
     setSuggestedRecipes([]);
     setSelectedRecipe(null);
     setInputValue('');
@@ -456,7 +585,7 @@ export function AICookingAssistant({
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleClearChat}
+            onClick={handleNewSession}
             disabled={isTyping}
             className="px-3 py-1.5 text-sm rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors disabled:opacity-50"
             title="New chat"
@@ -464,8 +593,69 @@ export function AICookingAssistant({
           >
             {t('ai.newChat')}
           </button>
+          <button
+            onClick={handleClearChat}
+            disabled={isTyping}
+            className="px-3 py-1.5 text-sm rounded-lg text-muted hover:text-ink hover:bg-sage/50 transition-colors disabled:opacity-50"
+            title="Clear chat"
+            aria-label="Clear current chat"
+          >
+            Clear
+          </button>
         </div>
       </div>
+      {sessions.length > 0 && (
+        <div className="max-w-2xl mx-auto px-6 lg:px-8 pb-2 flex gap-2 overflow-x-auto">
+          {sessions.map((session) => (
+            <button
+              key={session.id}
+              type="button"
+              disabled={isTyping}
+              onClick={() => void handleSwitchSession(session.id)}
+              className={`shrink-0 px-3 py-1.5 text-xs rounded-full border transition-colors disabled:opacity-50 ${
+                session.id === activeSessionId
+                  ? 'bg-herb text-white border-herb'
+                  : 'bg-surface text-muted border-line hover:text-ink'
+              }`}
+            >
+              {session.title || 'Chat'}
+            </button>
+          ))}
+        </div>
+      )}
+      {pendingApproval && (
+        <div className="max-w-2xl mx-auto px-6 lg:px-8 pb-2">
+          <div className="rounded-xl border border-line bg-surface p-4">
+            <p className="text-sm font-medium text-ink">Approve these changes?</p>
+            <ul className="mt-2 space-y-1 text-xs text-muted">
+              {pendingApproval.pendingTools.map((tool, index) => (
+                <li key={`${tool.name}-${index}`}>
+                  <span className="font-medium text-ink">{tool.name}</span>
+                  {tool.argsSummary ? ` — ${tool.argsSummary}` : ''}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={isTyping}
+                onClick={() => void handleResume('approve')}
+                className="flex-1 bg-herb text-white py-2 rounded-lg text-sm disabled:opacity-50"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                disabled={isTyping}
+                onClick={() => void handleResume('reject')}
+                className="flex-1 bg-sage/40 text-ink py-2 rounded-lg text-sm disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Main Content */}
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 lg:px-8 py-6 flex flex-col">
         {selectedRecipe /* Recipe Detail View */ ? <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden flex-1">
@@ -518,6 +708,13 @@ export function AICookingAssistant({
           <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden flex-1 flex flex-col">
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto p-4">
+              {messages.length === 0 ? (
+                <div className="h-full min-h-[12rem] flex items-center justify-center px-4">
+                  <p className="text-center text-muted text-sm sm:text-base max-w-md">
+                    {t('ai.welcome')}
+                  </p>
+                </div>
+              ) : (
               <div className="space-y-6">
                 {messages.map(message => <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 ${message.role === 'user' ? 'bg-herb text-white' : message.type === 'error' ? 'bg-sage/50 text-herb-deep border border-line' : 'bg-sage/40 text-ink'}`}>
@@ -705,6 +902,7 @@ export function AICookingAssistant({
                 </div>}
                 <div ref={messagesEndRef} />
               </div>
+              )}
             </div>
             {/* Input Area — ChatGPT / Claude-style composer */}
             <div className="border-t border-line bg-surface px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">

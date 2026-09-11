@@ -224,10 +224,25 @@
     "placeholder": "Ask about cooking, meal plans, or recipes...",
     "welcome": "Hi! Tell me what you need — import a recipe URL, plan your week, update your pantry, or ask what you can cook. I'll handle it and show you what changed.",
     "newChat": "New chat",
+    "emptyHint": "Skip the forms — just tell the AI what you need.",
+    "emptyCta": {
+      "pantry": "Ask AI to update pantry",
+      "shopping": "Ask AI to build a list",
+      "recipes": "Ask AI to import a recipe",
+      "calendar": "Ask AI to plan this week"
+    },
+    "emptyPrompts": {
+      "pantry": "Add chicken, rice, and broccoli to my pantry",
+      "shopping": "Add milk, eggs, and bread to my shopping list",
+      "recipes": "Import a recipe from a URL (website, YouTube, or Instagram)",
+      "calendar": "Plan dinners for the rest of this week",
+      "cook": "What can I cook with what I have?"
+    },
     "suggestedPrompts": [
       "What can I cook with what I have?",
       "Plan dinners for the rest of this week",
       "Import a recipe from a URL",
+      "Import a recipe from a YouTube or Instagram link",
       "Add chicken, rice, and broccoli to my pantry",
       "Organize my pantry"
     ],

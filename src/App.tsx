@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Home } from './components/Home';
 import { Calendar } from './components/Calendar';
@@ -29,9 +30,12 @@ const KEEP_ALIVE_VIEWS = [
 ] as const;
 
 function AppContent() {
+  const { t } = useTranslation();
   const [currentView, setCurrentView] = useState('aiAssistant');
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+  const [pendingAiPrompt, setPendingAiPrompt] = useState<string | null>(null);
   const [visitedViews, setVisitedViews] = useState<Set<string>>(() => new Set(['aiAssistant']));
+  const [subscriptionNotice, setSubscriptionNotice] = useState<'success' | 'cancelled' | null>(null);
   const {
     isAuthenticated,
     initializing,
@@ -40,6 +44,16 @@ function AppContent() {
 
   useEffect(() => {
     if (initializing) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const subscriptionParam = params.get('subscription');
+    if (subscriptionParam === 'success' || subscriptionParam === 'cancelled') {
+      setSubscriptionNotice(subscriptionParam);
+      if (isAuthenticated) {
+        setCurrentView('settings');
+      }
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
     if (redirectError) {
       setCurrentView('login');
@@ -97,8 +111,14 @@ function AppContent() {
   const navigateToSettings = () => {
     setCurrentView('settings');
   };
-  const navigateToAiAssistant = () => {
+  const navigateToAiAssistant = (prompt?: string) => {
+    if (typeof prompt === 'string' && prompt.trim()) {
+      setPendingAiPrompt(prompt);
+    }
     setCurrentView('aiAssistant');
+  };
+  const askAiFromHome = () => {
+    navigateToAiAssistant(t('ai.emptyPrompts.cook'));
   };
 
   // Show loading screen while checking authentication
@@ -132,7 +152,7 @@ function AppContent() {
         <div className={currentView === 'home' ? undefined : 'hidden'} aria-hidden={currentView !== 'home'}>
           <Home
             onLogin={navigateToLogin}
-            onCookWithWhatIHave={navigateToAiAssistant}
+            onCookWithWhatIHave={askAiFromHome}
             onViewCalendar={navigateToCalendar}
             onPantryInventory={navigateToPantryInventory}
             onShoppingList={navigateToShoppingList}
@@ -148,6 +168,8 @@ function AppContent() {
         >
           <AICookingAssistant
             isActive={currentView === 'aiAssistant'}
+            pendingPrompt={pendingAiPrompt}
+            onPendingPromptConsumed={() => setPendingAiPrompt(null)}
             onBack={navigateToHome}
             onViewRecipe={(recipeId) => {
               setSelectedRecipeId(recipeId);
@@ -161,7 +183,7 @@ function AppContent() {
       )}
       {showKeepAlive('calendar') && (
         <div className={currentView === 'calendar' ? undefined : 'hidden'} aria-hidden={currentView !== 'calendar'}>
-          <Calendar onBack={navigateToHome} />
+          <Calendar onBack={navigateToHome} onAskAi={navigateToAiAssistant} />
         </div>
       )}
       {showKeepAlive('recipeManager') && (
@@ -171,6 +193,7 @@ function AppContent() {
         >
           <RecipeManager
             onBack={navigateToHome}
+            onAskAi={navigateToAiAssistant}
             selectedRecipeId={selectedRecipeId}
             onSelectedRecipeHandled={() => setSelectedRecipeId(null)}
           />
@@ -178,7 +201,11 @@ function AppContent() {
       )}
       {showKeepAlive('settings') && (
         <div className={currentView === 'settings' ? undefined : 'hidden'} aria-hidden={currentView !== 'settings'}>
-          <Settings onBack={navigateToHome} />
+          <Settings
+            onBack={navigateToHome}
+            checkoutSuccess={subscriptionNotice === 'success'}
+            checkoutCancelled={subscriptionNotice === 'cancelled'}
+          />
         </div>
       )}
       {showKeepAlive('pantryInventory') && (
@@ -186,7 +213,7 @@ function AppContent() {
           className={currentView === 'pantryInventory' ? undefined : 'hidden'}
           aria-hidden={currentView !== 'pantryInventory'}
         >
-          <PantryInventory onBack={navigateToHome} />
+          <PantryInventory onBack={navigateToHome} onAskAi={navigateToAiAssistant} />
         </div>
       )}
       {showKeepAlive('shoppingList') && (
@@ -194,7 +221,7 @@ function AppContent() {
           className={currentView === 'shoppingList' ? undefined : 'hidden'}
           aria-hidden={currentView !== 'shoppingList'}
         >
-          <ShoppingList onBack={navigateToHome} />
+          <ShoppingList onBack={navigateToHome} onAskAi={navigateToAiAssistant} />
         </div>
       )}
       {currentView === 'signup' && (

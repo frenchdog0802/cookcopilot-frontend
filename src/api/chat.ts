@@ -11,14 +11,22 @@ export type ChatResponseType =
     | 'meal_suggestions'
     | 'multi_action'
     | 'action_result'
+    | 'interrupt'
     | 'error';
 
 export interface ChatRequest {
     message: string;
+    sessionId?: string;
     recipeContext?: {
         recipeId: string;
         recipeName: string;
     };
+}
+
+export interface ChatResumeRequest {
+    sessionId: string;
+    decision: 'approve' | 'reject';
+    note?: string;
 }
 
 export interface ChatResponse {
@@ -27,11 +35,27 @@ export interface ChatResponse {
     data?: Record<string, unknown>;
 }
 
+export interface PendingToolSummary {
+    name: string;
+    argsSummary: string;
+    id?: string;
+}
+
+export interface ChatSession {
+    id: string;
+    title: string;
+    isDefault: boolean;
+    updatedAt: number | null;
+    createdAt: number | null;
+}
+
 export interface HistoryMessage {
     id: string;
     role: 'user' | 'assistant';
     content: string;
     createdAt: number;
+    responseType?: string;
+    cardData?: Record<string, unknown>;
 }
 
 export interface StreamSendHandlers {
@@ -39,6 +63,7 @@ export interface StreamSendHandlers {
     onDone: (response: ChatResponse) => void;
     onError: (message: string) => void;
     onStatus?: (status: { tool?: string; message: string }) => void;
+    onInterrupt?: (response: ChatResponse) => void;
 }
 
 export const CARD_RESPONSE_TYPES: ChatResponseType[] = [
@@ -112,6 +137,20 @@ function parseSseEvent(block: string, handlers: StreamSendHandlers) {
         return;
     }
 
+    if (eventName === 'interrupt') {
+        try {
+            const parsed = JSON.parse(data) as ChatResponse;
+            handlers.onInterrupt?.(parsed);
+        } catch {
+            handlers.onInterrupt?.({
+                type: 'interrupt',
+                message: data,
+                data: {},
+            });
+        }
+        return;
+    }
+
     if (eventName === 'done') {
         handlers.onDone(JSON.parse(data) as ChatResponse);
         return;
@@ -140,6 +179,7 @@ async function consumeSseStream(
     const wrappedHandlers: StreamSendHandlers = {
         onToken: handlers.onToken,
         onStatus: handlers.onStatus,
+        onInterrupt: handlers.onInterrupt,
         onDone: (response) => {
             receivedTerminalEvent = true;
             handlers.onDone(response);
@@ -183,6 +223,8 @@ async function consumeSseStream(
 
 export const chatApi = {
     send: (data: ChatRequest) => api.post<ChatResponse>('/api/chat/send', data),
+    resume: (data: ChatResumeRequest) =>
+        api.post<ChatResponse>('/api/chat/resume', data),
     streamSend: async (data: ChatRequest, handlers: StreamSendHandlers, signal?: AbortSignal) => {
         const token = getAuthToken();
         const response = await fetch(`${BASE_URL}/api/chat/stream`, {
@@ -209,7 +251,24 @@ export const chatApi = {
 
         await consumeSseStream(response.body, handlers, signal);
     },
-    getHistory: () => api.get<{ messages: HistoryMessage[] }>('/api/chat/history'),
-    clearHistory: () => api.delete<{ cleared: boolean }>('/api/chat/history'),
+    listSessions: () => api.get<{ sessions: ChatSession[] }>('/api/chat/sessions'),
+    createSession: (title?: string) =>
+        api.post<ChatSession>('/api/chat/sessions', title ? { title } : {}),
+    renameSession: (id: string, title: string) =>
+        api.patch<ChatSession>(`/api/chat/sessions/${id}`, { title }),
+    deleteSession: (id: string) =>
+        api.delete<{ deleted: boolean }>(`/api/chat/sessions/${id}`),
+    getHistory: (sessionId?: string) =>
+        api.get<{ sessionId: string; messages: HistoryMessage[] }>(
+            sessionId
+                ? `/api/chat/history?sessionId=${encodeURIComponent(sessionId)}`
+                : '/api/chat/history',
+        ),
+    clearHistory: (sessionId?: string) =>
+        api.delete<{ cleared: boolean; sessionId: string }>(
+            sessionId
+                ? `/api/chat/history?sessionId=${encodeURIComponent(sessionId)}`
+                : '/api/chat/history',
+        ),
     getActions: () => api.get<{ actions: string[]; description: string }>('/api/chat/actions'),
 };

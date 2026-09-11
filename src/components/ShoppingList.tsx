@@ -6,13 +6,15 @@ import { IngredientEntry, PantryItem, ShoppingListItem } from '../api/types';
 import useSearchIngredients from '../hooks/useSearchIngredient';
 import { NumberInput } from './NumberInput';
 import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from './UnitSelect';
+import { AskAiEmptyCta } from './AskAiEmptyCta';
 import type { MeasurementSystem } from '../utils/units';
 
 interface ShoppingListProps {
     onBack: () => void;
+    onAskAi?: (prompt: string) => void;
 }
 
-export function ShoppingList({ onBack }: ShoppingListProps) {
+export function ShoppingList({ onBack, onAskAi }: ShoppingListProps) {
     const { t } = useTranslation();
     const {
         shoppingList: oriShoppingList,
@@ -40,15 +42,15 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
     const [dropdownVisible, setDropdownVisible] = useState(false);
     const [isAddingShoppingItem, setIsAddingShoppingItem] = useState(false);
     const [isCompletingAll, setIsCompletingAll] = useState(false);
-    const [selectedIndex, setSelectedIndex] = useState(-1);  // ?ùù????ùù??ù?ù?
+    const [selectedIndex, setSelectedIndex] = useState(-1);  // ???????????????
 
-    // Shopping item search dropdown???ù? name???? debounceù?
+    // Shopping item search dropdown????? name???? debounce??
     const { filteredIngredients: filteredShoppingIngredients, loading: shoppingLoading } = useSearchIngredients(
         newShoppingItem.name,
         ingredients
     );
 
-    // Auto-select if exactly one match and exact name match?? useMemo ?ùù????ù??ùù?
+    // Auto-select if exactly one match and exact name match?? useMemo ?????????????
     const autoSelectLogic = useMemo(() => {
         if (filteredShoppingIngredients.length === 1) {
             const match = filteredShoppingIngredients[0];
@@ -91,7 +93,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
         setShoppingList(oriShoppingList);
     }, [oriShoppingList]);
 
-    // ?ùù????ù????ùù???
+    // ?????????????????
     const handleSelectIngredient = (ingredient: IngredientEntry) => {
         setNewShoppingItem({
             name: ingredient.name,
@@ -252,7 +254,7 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                         const newName = e.target.value;
                                         setNewShoppingItem({ ...newShoppingItem, name: newName });
                                         setDropdownVisible(newName.length > 0);
-                                        setSelectedIndex(-1);  // ?ù??ùù?
+                                        setSelectedIndex(-1);  // ???????
                                     }}
                                     onKeyDown={(e) => {
                                         if (!dropdownVisible || filteredShoppingIngredients.length === 0) return;
@@ -387,13 +389,21 @@ export function ShoppingList({ onBack }: ShoppingListProps) {
                                 aria-label="Complete all items"
                             >
                                 <CheckIcon size={14} />
-                                {isCompletingAll ? 'Completingù' : 'Complete all'}
+                                {isCompletingAll ? 'Completing?' : 'Complete all'}
                             </button>
                         </div>
                         {filteredShoppingItems.length === 0 ? (
                             <div className="p-6 text-center">
                                 <p className="text-muted">{t('shopping.empty')}</p>
-                                {shoppingSearchQuery && <p className="text-muted text-sm mt-1">Try a different search term</p>}
+                                {shoppingSearchQuery ? (
+                                    <p className="text-muted text-sm mt-1">Try a different search term</p>
+                                ) : onAskAi ? (
+                                    <AskAiEmptyCta
+                                        hint={t('ai.emptyHint')}
+                                        label={t('ai.emptyCta.shopping')}
+                                        onClick={() => onAskAi(t('ai.emptyPrompts.shopping'))}
+                                    />
+                                ) : null}
                             </div>
                         ) : (
                             <ul className="divide-y divide-line">

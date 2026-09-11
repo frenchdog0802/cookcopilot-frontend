@@ -6,13 +6,15 @@ import { IngredientEntry, PantryItem } from '../api/types';
 import useSearchIngredients from '../hooks/useSearchIngredient';
 import { NumberInput } from './NumberInput';
 import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from './UnitSelect';
+import { AskAiEmptyCta } from './AskAiEmptyCta';
 import type { MeasurementSystem } from '../utils/units';
 
 interface PantryInventoryProps {
     onBack: () => void;
+    onAskAi?: (prompt: string) => void;
 }
 
-export function PantryInventory({ onBack }: PantryInventoryProps) {
+export function PantryInventory({ onBack, onAskAi }: PantryInventoryProps) {
     const { t } = useTranslation();
     const {
         pantryItems: oriPantryItems,
@@ -315,9 +317,15 @@ export function PantryInventory({ onBack }: PantryInventoryProps) {
                         <div className="bg-surface rounded-xl p-10 text-center shadow-sm border border-line">
                             <PackageIcon size={40} className="mx-auto mb-3 text-muted/40" />
                             <p className="text-ink font-medium">{t('pantry.empty')}</p>
-                            {searchQuery && (
+                            {searchQuery ? (
                                 <p className="text-muted text-sm mt-1">{t('common.tryDifferentSearch')}</p>
-                            )}
+                            ) : onAskAi ? (
+                                <AskAiEmptyCta
+                                    hint={t('ai.emptyHint')}
+                                    label={t('ai.emptyCta.pantry')}
+                                    onClick={() => onAskAi(t('ai.emptyPrompts.pantry'))}
+                                />
+                            ) : null}
                         </div>
                     ) : (
                         <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden divide-y divide-line">

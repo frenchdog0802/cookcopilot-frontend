@@ -224,10 +224,25 @@
     "placeholder": "詢問烹飪、菜單或食譜...",
     "welcome": "嗨！告訴我你需要什麼 — 匯入食譜網址、規劃本週菜單、更新冰箱庫存，或問我能煮什麼。我會幫你處理並顯示變更。",
     "newChat": "新對話",
+    "emptyHint": "不用自己填表單 — 直接跟 AI 說你要什麼。",
+    "emptyCta": {
+      "pantry": "請 AI 更新冰箱",
+      "shopping": "請 AI 建立購物清單",
+      "recipes": "請 AI 匯入食譜",
+      "calendar": "請 AI 規劃本週"
+    },
+    "emptyPrompts": {
+      "pantry": "把雞胸肉、米和花椰菜加入冰箱",
+      "shopping": "把牛奶、雞蛋和麵包加入購物清單",
+      "recipes": "從網址匯入食譜（網站、YouTube 或 Instagram）",
+      "calendar": "幫我規劃這週剩下的晚餐",
+      "cook": "我現有的食材可以煮什麼？"
+    },
     "suggestedPrompts": [
       "我現有的食材可以煮什麼？",
       "幫我規劃這週剩下的晚餐",
       "從網址匯入一道食譜",
+      "從 YouTube 或 Instagram 連結匯入食譜",
       "把雞胸肉、米和花椰菜加入冰箱",
       "整理我的冰箱庫存"
     ],

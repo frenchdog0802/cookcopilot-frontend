@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/authContext';
 import { usePantry } from '../contexts/pantryContext';
-import { ArrowLeftIcon, UserIcon, PaletteIcon, SaveIcon, LanguagesIcon } from 'lucide-react';
+import { ArrowLeftIcon, UserIcon, PaletteIcon, SaveIcon, LanguagesIcon, CrownIcon } from 'lucide-react';
+import { SubscriptionPanel } from './SubscriptionPanel';
 import { userPreferencesApi } from '../api/userPreferences';
 import type { UserPreferences } from '../api/types';
 import { AppLanguage, persistLanguage } from '../i18n';
 
 interface SettingsProps {
   onBack: () => void;
+  checkoutSuccess?: boolean;
+  checkoutCancelled?: boolean;
 }
 
 const EMPTY_PREFS: UserPreferences = {
@@ -32,11 +35,13 @@ function textToList(value: string): string[] {
     .filter(Boolean);
 }
 
-export function Settings({ onBack }: SettingsProps) {
+export function Settings({ onBack, checkoutSuccess = false, checkoutCancelled = false }: SettingsProps) {
   const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const { userSettings, updateUserSettings } = usePantry();
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState(
+    checkoutSuccess || checkoutCancelled ? 'subscription' : 'profile',
+  );
   const [language, setLanguage] = useState<AppLanguage>(
     i18n.language?.startsWith('zh') ? 'zh' : 'en'
   );
@@ -162,6 +167,13 @@ export function Settings({ onBack }: SettingsProps) {
                 onClick={() => setActiveTab('preferences')}
               >
                 {t('settings.preferences')}
+              </button>
+              <button
+                className={`px-6 py-4 text-sm font-medium flex items-center ${tabClass('subscription')}`}
+                onClick={() => setActiveTab('subscription')}
+              >
+                <CrownIcon size={18} className="mr-2" />
+                Subscription
               </button>
               <button
                 className={`px-6 py-4 text-sm font-medium flex items-center ${tabClass('appearance')}`}
@@ -315,6 +327,13 @@ export function Settings({ onBack }: SettingsProps) {
                   </>
                 )}
               </div>
+            )}
+
+            {activeTab === 'subscription' && (
+              <SubscriptionPanel
+                checkoutSuccess={checkoutSuccess}
+                checkoutCancelled={checkoutCancelled}
+              />
             )}
 
             {activeTab === 'appearance' && (

@@ -8,16 +8,19 @@ import { compressImage } from '../utils/imageHelper';
 import { Loading } from './Loading';
 import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from './UnitSelect';
 import { fromBase, resolveIngredientUnits, type MeasurementSystem } from '../utils/units';
+import { AskAiEmptyCta } from './AskAiEmptyCta';
 
 
 interface RecipeManagerProps {
   onBack: () => void;
+  onAskAi?: (prompt: string) => void;
   selectedRecipeId?: string | null;
   onSelectedRecipeHandled?: () => void;
 }
 
 export function RecipeManager({
   onBack,
+  onAskAi,
   selectedRecipeId,
   onSelectedRecipeHandled,
 }: RecipeManagerProps) {
@@ -570,9 +573,17 @@ export function RecipeManager({
             <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden">
               {filteredRecipes.length === 0 ? <div className="p-6 text-center">
                 <p className="text-muted">{t('recipes.empty')}</p>
-                {searchQuery && <p className="text-muted text-sm mt-1">
-                  {t('common.tryDifferentSearch')}
-                </p>}
+                {searchQuery ? (
+                  <p className="text-muted text-sm mt-1">
+                    {t('common.tryDifferentSearch')}
+                  </p>
+                ) : onAskAi ? (
+                  <AskAiEmptyCta
+                    hint={t('ai.emptyHint')}
+                    label={t('ai.emptyCta.recipes')}
+                    onClick={() => onAskAi(t('ai.emptyPrompts.recipes'))}
+                  />
+                ) : null}
               </div> : <ul className="divide-y divide-line">
                 {filteredRecipes.map(recipe => <li key={recipe.id} className="p-4">
                   <div className="flex justify-between">

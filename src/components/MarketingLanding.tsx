@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+﻿import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Player } from '@remotion/player';
 import {
   HeroScene,
@@ -9,6 +9,7 @@ import {
   HERO_WIDTH,
 } from '../remotion/HeroScene';
 import { DemoChatBox } from './DemoChatBox';
+import { PricingSection } from './PricingSection';
 
 interface MarketingLandingProps {
   onGetStarted: () => void;
@@ -98,18 +99,18 @@ function HeroVisual({ prefersReducedMotion }: { prefersReducedMotion: boolean })
 export function MarketingLanding({ onGetStarted, onLogin }: MarketingLandingProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  const handleWaitlistSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    window.alert('Thanks for joining! We will notify you soon.');
-  };
-
   return (
     <div className="min-h-screen bg-linen text-ink">
       <nav className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-line bg-linen/90 px-[5%] py-4 backdrop-blur-md">
         <span className="font-display text-xl font-semibold text-ink">LarderMind</span>
-        <button type="button" onClick={onLogin} className="btn-secondary text-sm">
-          Log in
-        </button>
+        <div className="flex items-center gap-4">
+          <a href="#pricing" className="text-sm text-muted hover:text-ink">
+            Pricing
+          </a>
+          <button type="button" onClick={onLogin} className="btn-secondary text-sm">
+            Log in
+          </button>
+        </div>
       </nav>
 
       <header className="relative flex min-h-screen flex-col justify-end overflow-hidden">
@@ -294,6 +295,8 @@ export function MarketingLanding({ onGetStarted, onLogin }: MarketingLandingProp
         </div>
       </section>
 
+      <PricingSection onGetStarted={onGetStarted} />
+
       <section id="join" className="border-t border-line px-[5%] py-20">
         <RevealOnScroll>
           <div className="mx-auto max-w-xl text-center">
@@ -301,29 +304,16 @@ export function MarketingLanding({ onGetStarted, onLogin }: MarketingLandingProp
               Stop the dinner stress today
             </h2>
             <p className="mt-3 text-lg text-muted">
-              Join the waitlist for early access to LarderMind.
+              Create a free account and start planning meals with AI in minutes.
             </p>
-            <form
-              onSubmit={handleWaitlistSubmit}
-              className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-stretch"
-            >
-              <input
-                type="email"
-                placeholder="Enter your email address"
-                required
-                aria-label="Email address"
-                className="input-field flex-1"
-              />
-              <button type="submit" className="btn-primary whitespace-nowrap">
-                Join free beta
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <button type="button" onClick={onGetStarted} className="btn-primary">
+                Get started free
               </button>
-            </form>
-            <p className="mt-6 text-sm text-muted">
-              Already have an account?{' '}
-              <button type="button" onClick={onLogin} className="font-medium text-herb underline">
+              <button type="button" onClick={onLogin} className="btn-secondary px-6 py-3">
                 Log in
               </button>
-            </p>
+            </div>
           </div>
         </RevealOnScroll>
       </section>
